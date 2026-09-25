@@ -1,0 +1,21 @@
+# CMake build directory
+/build/
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# Compiled binaries
+*.o
+*.a
+*.so
+*.so.*
+*.out
+
+# Temporary files
+*.tmp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
