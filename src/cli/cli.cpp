@@ -1,7 +1,7 @@
 #include "cli.hpp"
+#include "command_line.hpp"
 
 #include <iostream>
-#include <string_view>
 
 namespace athena::cli {
 
@@ -23,23 +23,58 @@ void print_help()
 
 int run(int argc, char* argv[])
 {
-    if (argc >= 2) {
-        const std::string_view command{argv[1]};
+    const CommandLine command_line = parse(argc, argv);
 
-        if (command == "--version" || command == "-V") {
-            std::cout << "Athena Package Manager 0.1.0\n";
-            return 0;
-        }
-
-        if (command == "--help" || command == "-h") {
-            print_help();
-            return 0;
-        }
+    if (command_line.command == "--version" ||
+        command_line.command == "-V") {
+        std::cout << "Athena Package Manager 0.1.0\n";
+        return 0;
     }
 
-    print_help();
-    return 0;
+    if (command_line.command == "--help" ||
+        command_line.command == "-h" ||
+        command_line.command.empty()) {
+        print_help();
+        return 0;
+    }
+
+    if (command_line.command == "install") {
+        std::cout << "Install command\n";
+
+        if (!command_line.arguments.empty()) {
+            std::cout << "Package: " << command_line.arguments[0] << '\n';
+        }
+
+        return 0;
+    }
+
+    if (command_line.command == "remove") {
+        std::cout << "Remove command\n";
+
+        if (!command_line.arguments.empty()) {
+            std::cout << "Package: " << command_line.arguments[0] << '\n';
+        }
+
+        return 0;
+    }
+
+    if (command_line.command == "list") {
+        std::cout << "List command\n";
+        return 0;
+    }
+
+    if (command_line.command == "info") {
+        std::cout << "Info command\n";
+
+        if (!command_line.arguments.empty()) {
+            std::cout << "Package: " << command_line.arguments[0] << '\n';
+        }
+
+        return 0;
+    }
+
+    std::cout << "Unknown command: " << command_line.command << '\n';
+    return 1;
 }
 
 }
-
