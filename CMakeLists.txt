@@ -14,6 +14,11 @@ add_executable(athena
     src/main.cpp
     src/cli/cli.cpp
     src/cli/command_line.cpp
+    src/package/package.cpp
+    src/package/package_loader.cpp
+    src/download/downloader.cpp
+    src/verify/verifier.cpp
+    src/install/installer.cpp
 )
 
 target_include_directories(athena

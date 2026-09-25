@@ -1,7 +1,13 @@
 #include "cli.hpp"
 #include "command_line.hpp"
+#include "../package/package.hpp"
+#include "../package/package_loader.hpp"
+#include "../download/downloader.hpp"
+#include "../verify/verifier.hpp"
+#include "../install/installer.hpp"
 
 #include <iostream>
+#include <filesystem>
 
 namespace athena::cli {
 
@@ -38,14 +44,45 @@ int run(int argc, char* argv[])
         return 0;
     }
 
-    if (command_line.command == "install") {
-        std::cout << "Install command\n";
+    if (command_line.command == "download-test") {
+        const std::filesystem::path destination =
+            "/tmp/athena-hello-2.12.tar.gz";
 
-        if (!command_line.arguments.empty()) {
-            std::cout << "Package: " << command_line.arguments[0] << '\n';
+        try {
+            const auto downloaded =
+                athena::download::download_file(
+                    "https://ftp.gnu.org/gnu/hello/hello-2.12.tar.gz",
+                    destination
+                );
+
+            std::cout << "Download completato: "
+                      << downloaded << '\n';
+
+            return 0;
+        }
+        catch (const std::exception& error) {
+            std::cerr << "Errore: " << error.what() << '\n';
+            return 1;
+        }
+    }
+
+    if (command_line.command == "install") {
+        if (command_line.arguments.empty()) {
+            std::cout << "Usage: athena install <package>\n";
+            return 1;
         }
 
-        return 0;
+        const std::filesystem::path package_file =
+            "packages/" + command_line.arguments[0] + "/package.toml";
+
+        try {
+            athena::install::install_package(package_file);
+            return 0;
+        }
+        catch (const std::exception& error) {
+            std::cerr << "Errore: " << error.what() << '\n';
+            return 1;
+        }
     }
 
     if (command_line.command == "remove") {
@@ -64,13 +101,27 @@ int run(int argc, char* argv[])
     }
 
     if (command_line.command == "info") {
-        std::cout << "Info command\n";
-
-        if (!command_line.arguments.empty()) {
-            std::cout << "Package: " << command_line.arguments[0] << '\n';
+        if (command_line.arguments.empty()) {
+            std::cout << "Usage: athena info <package>\n";
+            return 1;
         }
 
+        const std::filesystem::path package_file =
+            "packages/" + command_line.arguments[0] + "/package.toml";
+
+
+    try {
+        const athena::package::Package package =
+            athena::package::load_from_file(package_file);
+
+        athena::package::print_info(package);
         return 0;
+    }
+    catch (const std::exception& error) {
+        std::cerr << "Errore: " << error.what() << '\n';
+        return 1;
+    }
+
     }
 
     std::cout << "Unknown command: " << command_line.command << '\n';
