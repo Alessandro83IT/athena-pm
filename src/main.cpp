@@ -1,7 +1,6 @@
-#include <iostream>
+#include "cli/cli.hpp"
 
-int main()
+int main(int argc, char* argv[])
 {
-    std::cout << "Athena Package Manager 0.1.0\n";
-    return 0;
+    return athena::cli::run(argc, argv);
 }

@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(athena
     src/main.cpp
+    src/cli/cli.cpp
 )
 
 target_include_directories(athena
