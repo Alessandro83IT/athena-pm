@@ -4,6 +4,10 @@
 #include "../package/package_loader.hpp"
 #include "../download/downloader.hpp"
 #include "../verify/verifier.hpp"
+#include "../paths/paths.hpp"
+#include "../archive/archive.hpp"
+#include "../build/builder.hpp"
+#include "../store/store.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -22,7 +26,8 @@ void install_package(
         << " " << package.version << '\n';
 
     const std::filesystem::path destination =
-        "/tmp/athena-" + package.name + "-" + package.version + ".tar.gz";
+        athena::paths::downloads() /
+        ("athena-" + package.name + "-" + package.version + ".tar.gz");
 
     std::cout
         << "Download: " << package.source << '\n';
@@ -53,6 +58,59 @@ void install_package(
     }
 
     std::cout << "SHA-256 verificato correttamente.\n";
+
+    const std::filesystem::path source_directory =
+        athena::paths::sources();
+
+    std::cout
+        << "Estrazione in: "
+        << source_directory << '\n';
+
+    const auto extracted =
+        athena::archive::extract(
+            downloaded,
+            source_directory
+        );
+
+    std::cout
+        << "Estrazione completata: "
+        << extracted << '\n';
+
+    std::cout
+        << "Compilazione...\n";
+
+    athena::build::build(extracted);
+
+    std::cout
+        << "Compilazione completata.\n";
+
+    const std::filesystem::path staging =
+        athena::paths::build() /
+        (package.name + "-" + package.version + "-install");
+
+    std::cout
+        << "Installazione nello staging: "
+        << staging << '\n';
+
+    athena::build::install(
+        extracted,
+        staging
+    );
+
+    std::cout
+        << "Installazione nello staging completata.\n";
+
+    const auto installed =
+        athena::store::install(
+            staging,
+            package.name,
+            package.version
+        );
+
+    std::cout
+        << "Installazione nello store completata: "
+        << installed << '\n';
+
 }
 
 }
