@@ -104,8 +104,11 @@ void install_package(
         athena::store::install(
             staging,
             package.name,
-            package.version
-        );
+            package.version,
+            package.source,
+            package.sha256,
+            "autotools"
+    );    
 
     std::cout
         << "Installazione nello store completata: "

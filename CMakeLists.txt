@@ -23,6 +23,7 @@ add_executable(athena
     src/archive/archive.cpp
     src/build/builder.cpp
     src/store/store.cpp
+    src/store/metadata.cpp
 )
 
 target_include_directories(athena

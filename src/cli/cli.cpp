@@ -8,6 +8,7 @@
 #include "../paths/paths.hpp"
 #include "../archive/archive.hpp"
 #include "../store/store.hpp"
+#include "../store/metadata.hpp"
 
 #include <iostream>
 #include <filesystem>
@@ -58,31 +59,6 @@ int run(int argc, char* argv[])
             << "Store: " << athena::paths::store() << '\n';
 
         return 0;
-    }
-
-    if (command_line.command == "store-test") {
-          const std::filesystem::path staging =
-              "/tmp/athena-install-test";
-        try {
-            const auto installed =
-                athena::store::install(
-                    staging,
-                    "hello",
-                    "2.12"
-                );
-
-            std::cout
-                << "Installazione nello store completata: "
-                << installed << '\n';
-
-            return 0;
-        }
-        catch (const std::exception& error) {
-            std::cerr
-                << "Errore: " << error.what() << '\n';
-
-            return 1;
-        }
     }
 
     if (command_line.command == "extract-test") {
@@ -176,23 +152,34 @@ int run(int argc, char* argv[])
             return 1;
         }
 
-        const std::filesystem::path package_file =
-            "packages/" + command_line.arguments[0] + "/package.toml";
+        try {
+            const auto store_directory =
+                athena::store::find(
+                    command_line.arguments[0]
+                );
 
+            const auto metadata =
+                athena::store::read_metadata(
+                    store_directory
+                );
 
-    try {
-        const athena::package::Package package =
-            athena::package::load_from_file(package_file);
+            std::cout
+                << "Name: " << metadata.name << '\n'
+                << "Version: " << metadata.version << '\n'
+                << "Source: " << metadata.source << '\n'
+                << "SHA-256: " << metadata.sha256 << '\n'
+                << "Build system: " << metadata.build_system << '\n'
+                << "Store: " << store_directory << '\n';
 
-        athena::package::print_info(package);
-        return 0;
-    }
-    catch (const std::exception& error) {
-        std::cerr << "Errore: " << error.what() << '\n';
-        return 1;
-    }
+            return 0;
+        }
+        catch (const std::exception& error) {
+            std::cerr
+                << "Errore: " << error.what() << '\n';
 
-    }
+            return 1;
+        }
+    }   
 
     std::cout << "Unknown command: " << command_line.command << '\n';
     return 1;
