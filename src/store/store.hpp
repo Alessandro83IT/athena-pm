@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace athena::store {
 
@@ -40,5 +41,14 @@ std::filesystem::path install(
 std::filesystem::path find(
     const std::string& package_name
 );
+
+/*
+ * List all installed package store entries.
+ *
+ * The returned paths point to package directories under the Athena
+ * store. Only directories containing valid Athena metadata are
+ * included.
+ */
+std::vector<std::filesystem::path> list();
 
 }

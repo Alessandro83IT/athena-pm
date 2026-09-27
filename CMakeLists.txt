@@ -26,6 +26,7 @@ add_executable(athena
     src/build/cmake_backend.cpp
     src/store/store.cpp
     src/store/metadata.cpp
+    src/store/manifest.cpp
 )
 
 target_include_directories(athena

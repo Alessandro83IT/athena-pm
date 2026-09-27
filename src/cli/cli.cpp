@@ -227,9 +227,26 @@ int run(int argc, char* argv[])
      * The future implementation will query Athena's package store
      * and display the installed package set.
      */
+
     if (command_line.command == "list") {
 
-        std::cout << "List command\n";
+        const auto packages =
+            athena::store::list();
+
+        for (const auto& package_path : packages) {
+
+            const auto metadata =
+                athena::store::read_metadata(
+                    package_path
+                );
+
+            std::cout
+                << metadata.name
+                << " "
+                << metadata.version
+                << '\n';
+        }
+
         return 0;
     }
 
