@@ -1,5 +1,7 @@
 #include "activation.hpp"
 
+#include "../store/manifest.hpp"
+
 #include <iostream>
 #include <stdexcept>
 
@@ -21,27 +23,23 @@ void activate(
         << store_directory.string()
         << '\n';
 
-    for (const auto& entry :
-         std::filesystem::recursive_directory_iterator(store_directory)) {
+    const auto manifest =
+        athena::store::read_manifest(
+            store_directory
+        );
 
-        if (!entry.is_regular_file()) {
-            continue;
-        }
+    for (const auto& entry : manifest) {
 
-        const auto relative =
-            std::filesystem::relative(
-                entry.path(),
-                store_directory
-            );
+        const std::filesystem::path source =
+            store_directory / entry.path;
 
-        if (relative.begin() != relative.end() &&
-            *relative.begin() == ".athena") {
-            continue;
-        }
+        const std::filesystem::path target =
+            std::filesystem::path("/usr") /
+            entry.path;
 
         std::cout
-            << "  File: /usr/"
-            << relative.string()
+            << "  File: "
+            << target
             << '\n';
     }
 }
