@@ -9,4 +9,8 @@ void activate(
     const std::filesystem::path& store_directory
 );
 
+bool target_is_free(
+    const std::filesystem::path& target
+);
+
 }

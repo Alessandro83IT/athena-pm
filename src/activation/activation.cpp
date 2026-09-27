@@ -7,6 +7,17 @@
 
 namespace athena::activation {
 
+bool target_is_free(
+    const std::filesystem::path& target
+)
+{
+    const auto status =
+        std::filesystem::symlink_status(target);
+
+    return status.type() ==
+           std::filesystem::file_type::not_found;
+}
+
 void activate(
     const std::filesystem::path& store_directory
 )
@@ -36,6 +47,13 @@ void activate(
         const std::filesystem::path target =
             std::filesystem::path("/usr") /
             entry.path;
+
+        if (!target_is_free(target)) {
+            throw std::runtime_error(
+                "Conflitto: il file di destinazione esiste già: " +
+                target.string()
+            );
+        }
 
         std::cout
             << "  File: "
