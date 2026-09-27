@@ -27,6 +27,7 @@ add_executable(athena
     src/store/store.cpp
     src/store/metadata.cpp
     src/store/manifest.cpp
+    src/activation/activation.cpp
 )
 
 target_include_directories(athena

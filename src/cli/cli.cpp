@@ -9,6 +9,7 @@
 #include "../archive/archive.hpp"
 #include "../store/store.hpp"
 #include "../store/metadata.hpp"
+#include "../activation/activation.hpp"
 
 #include <iostream>
 #include <filesystem>
@@ -172,6 +173,40 @@ int run(int argc, char* argv[])
     }
 
     /*
+     * Temporary activation test.
+     *
+     * This command only displays the files that would be activated
+     * from a package store entry. It does not modify the live system.
+     */
+    if (command_line.command == "activate-test") {
+
+        if (command_line.arguments.empty()) {
+            std::cout
+                << "Usage: athena activate-test <store-directory>\n";
+            return 1;
+        }
+
+        const std::filesystem::path store_directory =
+            command_line.arguments[0];
+
+        try {
+
+            athena::activation::activate(
+                store_directory
+            );
+
+            return 0;
+        }
+        catch (const std::exception& error) {
+
+            std::cerr
+                << "Errore: " << error.what() << '\n';
+
+            return 1;
+        }
+    }
+
+    /*
      * Install a package using its package definition.
      *
      * The CLI only determines which package was requested and
@@ -222,17 +257,15 @@ int run(int argc, char* argv[])
     }
 
     /*
-     * List is currently only a placeholder.
+     * List installed packages.
      *
-     * The future implementation will query Athena's package store
-     * and display the installed package set.
+     * The command queries Athena's package store and displays
+     * every installed package version.
      */
-
     if (command_line.command == "list") {
 
         const auto packages =
             athena::store::list();
-
 
         for (const auto& package_path : packages) {
 
@@ -276,26 +309,17 @@ int run(int argc, char* argv[])
 
             for (const auto& package_path : packages) {
 
-                /*
-                 * Read the metadata associated with this store entry.
-                 */
                 const auto metadata =
                     athena::store::read_metadata(
                         package_path
                     );
 
-                /*
-                 * Ignore packages with a different name.
-                 */
                 if (metadata.name != package_name) {
                     continue;
                 }
 
                 found = true;
 
-                /*
-                 * Present the stored package information to the user.
-                 */
                 std::cout
                     << "Name: " << metadata.name << '\n'
                     << "Version: " << metadata.version << '\n'
@@ -324,12 +348,8 @@ int run(int argc, char* argv[])
         }
     }
 
-    /*
-     * If no known command matched the user's input, report the
-     * error and return a non-zero status to the shell.
-     */
-    std::cout
-        << "Unknown command: "
+    std::cerr
+        << "Comando sconosciuto: "
         << command_line.command
         << '\n';
 
