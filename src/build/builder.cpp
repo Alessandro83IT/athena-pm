@@ -1,19 +1,54 @@
 #include "builder.hpp"
+#include "autotools_backend.hpp"
 
-#include <cstdlib>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
 namespace athena::build {
 
 /*
- * Build a package from its extracted source directory.
+ * Select the build backend corresponding to the requested
+ * build-system name.
  *
- * The build system is declared in the package definition
- * (package.toml) and is passed to the builder by the installer.
+ * The dispatcher is responsible only for selecting the backend.
+ * The actual build and installation logic is implemented by
+ * the concrete backend classes.
  *
- * At the moment Athena supports only the Autotools build system.
- * Additional build systems will be dispatched from this function.
+ * For example:
+ *
+ *     "autotools" -> AutotoolsBackend
+ *     "cmake"     -> CMakeBackend
+ *     "meson"     -> MesonBackend
+ *
+ * Additional backends can therefore be added without moving
+ * their implementation into this file.
+ */
+std::unique_ptr<BuildBackend> create_backend(
+    const std::string& build_system
+)
+{
+    /*
+     * Select the Autotools backend.
+     */
+    if (build_system == "autotools") {
+        return std::make_unique<AutotoolsBackend>();
+    }
+
+    /*
+     * The requested build system is not implemented yet.
+     */
+    throw std::runtime_error(
+        "Sistema di build non supportato: " +
+        build_system
+    );
+}
+
+/*
+ * Build a package using the requested build-system backend.
+ *
+ * The dispatcher selects the appropriate backend and delegates
+ * the actual compilation to it.
  */
 void build(
     const std::filesystem::path& source_directory,
@@ -21,46 +56,23 @@ void build(
 )
 {
     /*
-     * Reject build systems that are not implemented yet.
-     *
-     * This prevents Athena from silently trying to use the wrong
-     * build commands for a package.
+     * Create the backend corresponding to the package's
+     * declared build system.
      */
-    if (build_system != "autotools") {
-        throw std::runtime_error(
-            "Sistema di build non supportato: " +
-            build_system
-        );
-    }
+    const auto backend =
+        create_backend(build_system);
 
     /*
-     * Autotools build:
-     *
-     * 1. Enter the extracted source directory.
-     * 2. Configure the package to install under /usr.
-     * 3. Compile the source code with make.
+     * Delegate the build operation to the selected backend.
      */
-    const std::string command =
-        "cd \"" + source_directory.string() +
-        "\" && ./configure --prefix=/usr && make";
-
-    const int result = std::system(command.c_str());
-
-    if (result != 0) {
-        throw std::runtime_error(
-            "Compilazione fallita in: " +
-            source_directory.string()
-        );
-    }
+    backend->build(source_directory);
 }
 
 /*
- * Install the already-built package into a staging directory.
+ * Install a previously built package into a staging directory.
  *
- * Athena does not install the files directly into the live system.
- * Instead, the package is installed into a temporary staging tree.
- *
- * The staging tree is later copied into the Athena package store.
+ * The dispatcher again selects the appropriate backend and
+ * delegates the installation operation to it.
  */
 void install(
     const std::filesystem::path& source_directory,
@@ -69,52 +81,19 @@ void install(
 )
 {
     /*
-     * The same build-system validation used during compilation
-     * is performed before the installation phase.
+     * Create the backend corresponding to the package's
+     * declared build system.
      */
-    if (build_system != "autotools") {
-        throw std::runtime_error(
-            "Sistema di build non supportato: " +
-            build_system
-        );
-    }
+    const auto backend =
+        create_backend(build_system);
 
     /*
-     * Start with an empty staging directory.
-     *
-     * This prevents files from a previous build from accidentally
-     * becoming part of the current package.
+     * Delegate the installation operation to the selected backend.
      */
-    std::filesystem::remove_all(staging_directory);
-    std::filesystem::create_directories(staging_directory);
-
-    /*
-     * Autotools installation:
-     *
-     * DESTDIR redirects the installation into the staging tree
-     * instead of installing directly into the running system.
-     *
-     * For example:
-     *
-     *   /usr/bin/hello
-     *
-     * becomes:
-     *
-     *   <staging>/usr/bin/hello
-     */
-    const std::string command =
-        "cd \"" + source_directory.string() +
-        "\" && make install DESTDIR=\"" +
-        staging_directory.string() + "\"";
-
-    const int result = std::system(command.c_str());
-
-    if (result != 0) {
-        throw std::runtime_error(
-            "Installazione fallita in: " +
-            source_directory.string()
-        );
-    }
+    backend->install(
+        source_directory,
+        staging_directory
+    );
 }
 
 }

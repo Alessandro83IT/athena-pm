@@ -22,6 +22,7 @@ add_executable(athena
     src/paths/paths.cpp
     src/archive/archive.cpp
     src/build/builder.cpp
+    src/build/autotools_backend.cpp
     src/store/store.cpp
     src/store/metadata.cpp
 )

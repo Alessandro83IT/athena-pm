@@ -1,19 +1,42 @@
 #pragma once
 
+#include "build_backend.hpp"
+
 #include <filesystem>
+#include <memory>
 #include <string>
 
 namespace athena::build {
 
 /*
+ * Create the build backend corresponding to the requested
+ * build-system name.
+ *
+ * The dispatcher hides the concrete backend implementation from
+ * the rest of Athena.
+ *
+ * For example:
+ *
+ *     "autotools" -> AutotoolsBackend
+ *     "cmake"     -> CMakeBackend
+ *     "meson"     -> MesonBackend
+ *
+ * An exception is thrown when the requested build system is not
+ * supported by Athena.
+ */
+std::unique_ptr<BuildBackend> create_backend(
+    const std::string& build_system
+);
+
+/*
  * Build a package from its extracted source directory.
  *
  * The build system is selected from the package definition.
- * The builder is responsible only for compiling the source;
- * it does not install files into the live system.
+ * The builder acts as a dispatcher and delegates the actual
+ * compilation to the selected build backend.
  *
- * The resulting build artifacts remain inside the source/build
- * environment until the installation phase.
+ * The package is not installed into the live system during this
+ * operation.
  */
 void build(
     const std::filesystem::path& source_directory,
