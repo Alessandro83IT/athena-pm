@@ -233,6 +233,7 @@ int run(int argc, char* argv[])
         const auto packages =
             athena::store::list();
 
+
         for (const auto& package_path : packages) {
 
             const auto metadata =
@@ -253,9 +254,8 @@ int run(int argc, char* argv[])
     /*
      * Display metadata for an installed package.
      *
-     * Unlike install, this command does not read the original
-     * package definition. It searches the store and reads the
-     * metadata recorded when the package was installed.
+     * All installed store entries are inspected so that multiple
+     * installed versions of the same package can be displayed.
      */
     if (command_line.command == "info") {
 
@@ -266,32 +266,52 @@ int run(int argc, char* argv[])
 
         try {
 
-            /*
-             * Locate the installed package in the Athena store.
-             */
-            const auto store_directory =
-                athena::store::find(
-                    command_line.arguments[0]
-                );
+            const std::string package_name =
+                command_line.arguments[0];
 
-            /*
-             * Read the metadata associated with that store entry.
-             */
-            const auto metadata =
-                athena::store::read_metadata(
-                    store_directory
-                );
+            const auto packages =
+                athena::store::list();
 
-            /*
-             * Present the stored package information to the user.
-             */
-            std::cout
-                << "Name: " << metadata.name << '\n'
-                << "Version: " << metadata.version << '\n'
-                << "Source: " << metadata.source << '\n'
-                << "SHA-256: " << metadata.sha256 << '\n'
-                << "Build system: " << metadata.build_system << '\n'
-                << "Store: " << store_directory << '\n';
+            bool found = false;
+
+            for (const auto& package_path : packages) {
+
+                /*
+                 * Read the metadata associated with this store entry.
+                 */
+                const auto metadata =
+                    athena::store::read_metadata(
+                        package_path
+                    );
+
+                /*
+                 * Ignore packages with a different name.
+                 */
+                if (metadata.name != package_name) {
+                    continue;
+                }
+
+                found = true;
+
+                /*
+                 * Present the stored package information to the user.
+                 */
+                std::cout
+                    << "Name: " << metadata.name << '\n'
+                    << "Version: " << metadata.version << '\n'
+                    << "Source: " << metadata.source << '\n'
+                    << "SHA-256: " << metadata.sha256 << '\n'
+                    << "Build system: " << metadata.build_system << '\n'
+                    << "Store: " << package_path << '\n'
+                    << '\n';
+            }
+
+            if (!found) {
+                throw std::runtime_error(
+                    "Pacchetto non installato: " +
+                    package_name
+                );
+            }
 
             return 0;
         }
