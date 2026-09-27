@@ -5,20 +5,54 @@
 
 namespace athena::package {
 
+/*
+ * Load a package definition from a TOML file.
+ *
+ * The package definition contains the metadata Athena needs
+ * to process the package, such as its name, version, source
+ * archive, checksum and build system.
+ *
+ * The TOML file is converted into a Package object so that
+ * the rest of the package-management pipeline does not need
+ * to know anything about the file format.
+ */
 Package load_from_file(const std::filesystem::path& path)
 {
     try {
+
+        /*
+         * Parse the TOML package definition.
+         *
+         * toml++ performs the syntax parsing and gives us access
+         * to the values stored in the document.
+         */
         const auto table = toml::parse_file(path.string());
 
+        /*
+         * Convert the TOML values into our internal Package model.
+         *
+         * build_system defaults to "autotools" when the field is
+         * not present. This keeps older package definitions
+         * compatible with the current implementation.
+         */
         return Package{
             table["name"].value_or(""),
             table["version"].value_or(""),
             table["description"].value_or(""),
             table["source"].value_or(""),
-            table["sha256"].value_or("")
+            table["sha256"].value_or(""),
+            table["build_system"].value_or("autotools")
         };
     }
     catch (const toml::parse_error& error) {
+
+        /*
+         * Convert the TOML-specific exception into a generic
+         * runtime_error with the package file path included.
+         *
+         * This allows higher-level modules, such as the installer,
+         * to report a useful error without depending on toml++.
+         */
         throw std::runtime_error(
             "Impossibile caricare il pacchetto '" +
             path.string() + "': " + error.what()

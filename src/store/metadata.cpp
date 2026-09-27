@@ -6,16 +6,34 @@
 
 namespace athena::store {
 
+/*
+ * Write the metadata of an installed package.
+ *
+ * Metadata is kept inside a dedicated .athena directory so that
+ * package files and Athena-specific information remain clearly
+ * separated.
+ */
 void write_metadata(
     const std::filesystem::path& store_directory,
     const Metadata& metadata
 )
 {
+    /*
+     * Create the directory used for Athena-specific metadata.
+     *
+     * Example:
+     *
+     *     /var/lib/athena/store/hello-2.12/.athena/
+     */
     const std::filesystem::path metadata_directory =
         store_directory / ".athena";
 
     std::filesystem::create_directories(metadata_directory);
 
+    /*
+     * Metadata is stored in TOML so that it remains human-readable
+     * and can easily be inspected or processed by other tools.
+     */
     const std::filesystem::path metadata_file =
         metadata_directory / "metadata.toml";
 
@@ -28,6 +46,12 @@ void write_metadata(
         );
     }
 
+    /*
+     * Write the package metadata.
+     *
+     * This information describes how the installed package was
+     * obtained and built.
+     */
     output
         << "name = \"" << metadata.name << "\"\n"
         << "version = \"" << metadata.version << "\"\n"
@@ -36,19 +60,35 @@ void write_metadata(
         << "build_system = \"" << metadata.build_system << "\"\n";
 }
 
+/*
+ * Read package metadata from an installed store entry.
+ *
+ * The metadata file is parsed using toml++ and converted back into
+ * Athena's internal Metadata representation.
+ */
 Metadata read_metadata(
     const std::filesystem::path& store_directory
 )
 {
+    /*
+     * Locate the metadata file associated with the store entry.
+     */
     const std::filesystem::path metadata_file =
         store_directory /
         ".athena" /
         "metadata.toml";
 
     try {
+
+        /*
+         * Parse the TOML metadata file.
+         */
         const auto table =
             toml::parse_file(metadata_file.string());
 
+        /*
+         * Convert the TOML values into a Metadata object.
+         */
         return Metadata{
             table["name"].value_or(""),
             table["version"].value_or(""),
@@ -58,6 +98,11 @@ Metadata read_metadata(
         };
     }
     catch (const toml::parse_error& error) {
+
+        /*
+         * Hide the TOML-specific exception from higher-level modules
+         * and provide a useful Athena-specific error message.
+         */
         throw std::runtime_error(
             "Impossibile leggere i metadati del pacchetto '" +
             store_directory.string() + "': " +
