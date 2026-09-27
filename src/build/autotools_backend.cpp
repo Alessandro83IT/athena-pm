@@ -15,13 +15,25 @@ namespace athena::build {
  *     make
  *
  * The package is configured with /usr as its installation prefix.
- * The actual installation is redirected to the staging directory
- * during the later install() phase.
+ *
+ * Autotools currently builds directly inside the source directory,
+ * so build_directory is not used yet. It is nevertheless part of
+ * the common backend interface so that other build systems, such as
+ * CMake, can use a dedicated out-of-source build directory.
  */
 void AutotoolsBackend::build(
-    const std::filesystem::path& source_directory
+    const std::filesystem::path& source_directory,
+    const std::filesystem::path& build_directory
 )
 {
+    /*
+     * Autotools does not currently use the separate build directory.
+     *
+     * Keep the parameter in the implementation because it is part
+     * of the common BuildBackend interface.
+     */
+    (void)build_directory;
+
     /*
      * Enter the package source directory, configure the package,
      * then compile it.
@@ -63,9 +75,15 @@ void AutotoolsBackend::build(
  */
 void AutotoolsBackend::install(
     const std::filesystem::path& source_directory,
+    const std::filesystem::path& build_directory,
     const std::filesystem::path& staging_directory
 )
 {
+    /*
+     * Autotools currently does not need the separate build directory.
+     */
+    (void)build_directory;
+
     /*
      * Start with an empty staging directory so that files from an
      * earlier build cannot accidentally become part of this package.

@@ -1,0 +1,6 @@
+name = "cmake-test"
+version = "1.0"
+description = "Test package for the Athena CMake backend"
+source = "file:///tmp/athena-cmake-test.tar.gz"
+sha256 = "e286b3666bbe456a7348a7606a8ebe6b5efc06eaaebb88dfb14006e16c483406"
+build_system = "cmake"

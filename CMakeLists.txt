@@ -23,6 +23,7 @@ add_executable(athena
     src/archive/archive.cpp
     src/build/builder.cpp
     src/build/autotools_backend.cpp
+    src/build/cmake_backend.cpp
     src/store/store.cpp
     src/store/metadata.cpp
 )
@@ -30,4 +31,15 @@ add_executable(athena
 target_include_directories(athena
     PRIVATE
         ${PROJECT_SOURCE_DIR}/include
+)
+
+# Standalone test for the CMake build backend.
+add_executable(cmake_backend_test
+    tests/cmake_backend_test.cpp
+    src/build/cmake_backend.cpp
+)
+
+target_include_directories(cmake_backend_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/build
 )

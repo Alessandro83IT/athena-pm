@@ -5,21 +5,23 @@
 namespace athena::build {
 
 /*
- * Build backend for packages using the GNU Autotools build system.
+ * Build backend for packages using the CMake build system.
  *
- * This backend encapsulates the commands required to configure,
- * compile and install an Autotools-based package.
+ * CMake normally supports out-of-source builds, meaning that
+ * generated build files and compilation artifacts are stored
+ * separately from the package source tree.
  */
-class AutotoolsBackend : public BuildBackend {
+class CMakeBackend : public BuildBackend {
 
 public:
 
     /*
      * Configure and compile the package.
      *
-     * build_directory is part of the common BuildBackend interface.
-     * Autotools currently builds directly inside the source tree,
-     * so the directory is not used yet.
+     * source_directory contains the package source.
+     *
+     * build_directory is the dedicated out-of-source CMake
+     * build directory.
      */
     void build(
         const std::filesystem::path& source_directory,
@@ -28,6 +30,9 @@ public:
 
     /*
      * Install the compiled package into a staging directory.
+     *
+     * CMake's install mechanism is redirected through DESTDIR
+     * so that files are not installed directly into the live system.
      */
     void install(
         const std::filesystem::path& source_directory,
