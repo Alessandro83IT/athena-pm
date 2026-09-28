@@ -215,6 +215,39 @@ int run(int argc, char* argv[])
      * constructs the path to package.toml. The installation pipeline
      * itself is implemented by the install module.
      */
+    if (command_line.command == "install-test") {
+
+        if (command_line.arguments.empty()) {
+            std::cout << "Usage: athena install-test <package>\n";
+            return 1;
+        }
+
+        const std::filesystem::path package_file =
+            "packages/" + command_line.arguments[0] + "/package.toml";
+
+        const std::filesystem::path target_root =
+            "/tmp/athena-install-test";
+
+        try {
+
+            athena::install::install_package(
+                package_file,
+                target_root
+            );
+
+            return 0;
+        }
+        catch (const std::exception& error) {
+
+            std::cerr
+                << "Errore: "
+                << error.what()
+                << '\n';
+
+            return 1;
+         }
+    }
+
     if (command_line.command == "install") {
 
         if (command_line.arguments.empty()) {
@@ -227,13 +260,17 @@ int run(int argc, char* argv[])
 
         try {
 
-            athena::install::install_package(package_file);
+            athena::install::install_package(
+                package_file,
+                "/tmp/athena-install-test"
+            );
+
             return 0;
-        }
+        } 
         catch (const std::exception& error) {
 
-            std::cerr << "Errore: " << error.what() << '\n';
-            return 1;
+             std::cerr << "Errore: " << error.what() << '\n';
+             return 1;
         }
     }
 

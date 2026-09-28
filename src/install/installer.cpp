@@ -8,14 +8,17 @@
 #include "../archive/archive.hpp"
 #include "../build/builder.hpp"
 #include "../store/store.hpp"
+#include "../activation/activation.hpp"
 
 #include <iostream>
 #include <stdexcept>
 
+
 namespace athena::install {
 
 void install_package(
-    const std::filesystem::path& package_file
+    const std::filesystem::path& package_file,
+    const std::filesystem::path& target_root
 )
 {
     const athena::package::Package package =
@@ -139,6 +142,17 @@ void install_package(
     std::cout
         << "Installazione nello store completata: "
         << installed << '\n';
+
+    std::cout
+        << "Attivazione del pacchetto...\n";
+
+    athena::activation::activate(
+        installed,
+        target_root / "usr"
+    );
+
+    std::cout
+        << "Attivazione completata.\n";
 }
 
 }

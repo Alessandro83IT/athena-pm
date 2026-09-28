@@ -29,7 +29,8 @@ namespace athena::install {
  * is then transferred into the Athena package store.
  */
 void install_package(
-    const std::filesystem::path& package_file
+    const std::filesystem::path& package_file,
+    const std::filesystem::path& target_root
 );
 
 }
