@@ -172,11 +172,12 @@ int run(int argc, char* argv[])
         }
     }
 
+
     /*
      * Temporary activation test.
      *
-     * This command only displays the files that would be activated
-     * from a package store entry. It does not modify the live system.
+     * This command activates a package into a temporary target
+     * directory instead of modifying the live system.
      */
     if (command_line.command == "activate-test") {
 
@@ -192,8 +193,9 @@ int run(int argc, char* argv[])
         try {
 
             athena::activation::activate(
-                store_directory
-            );
+                store_directory,
+                "/tmp/athena-activation-test/usr"
+            );         
 
             return 0;
         }

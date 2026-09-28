@@ -4,8 +4,28 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 
 namespace athena::activation {
+
+void activate_file(
+    const std::filesystem::path& source,
+    const std::filesystem::path& target
+)
+{
+    const auto parent =
+        target.parent_path();
+
+    if (!std::filesystem::exists(parent)) {
+        std::filesystem::create_directories(parent);
+    }
+
+    std::filesystem::create_symlink(
+        source,
+        target
+    );
+}
 
 bool target_is_free(
     const std::filesystem::path& target
@@ -19,7 +39,8 @@ bool target_is_free(
 }
 
 void activate(
-    const std::filesystem::path& store_directory
+    const std::filesystem::path& store_directory,
+    const std::filesystem::path& target_root
 )
 {
     if (!std::filesystem::exists(store_directory)) {
@@ -39,13 +60,20 @@ void activate(
             store_directory
         );
 
+    std::vector<
+        std::pair<
+            std::filesystem::path,
+            std::filesystem::path
+        >
+    > files;
+
     for (const auto& entry : manifest) {
 
         const std::filesystem::path source =
             store_directory / entry.path;
 
         const std::filesystem::path target =
-            std::filesystem::path("/usr") /
+            target_root /
             entry.path;
 
         if (!target_is_free(target)) {
@@ -55,11 +83,27 @@ void activate(
             );
         }
 
+        files.emplace_back(
+            source,
+            target
+        );
+    }
+
+    for (const auto& file : files) {
+
         std::cout
             << "  File: "
-            << target
+            << file.second
             << '\n';
+
+        activate_file(
+            file.first,
+            file.second
+        );
     }
+  
 }
 
 }
+
+
