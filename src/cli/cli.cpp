@@ -209,6 +209,41 @@ int run(int argc, char* argv[])
     }
 
     /*
+     * Temporary deactivation test.
+     *
+     * This command deactivates a package from a temporary target
+     * directory instead of modifying the live system.
+     */
+    if (command_line.command == "deactivate-test") {
+
+        if (command_line.arguments.empty()) {
+            std::cout
+                << "Usage: athena deactivate-test <store-directory>\n";
+            return 1;
+        }
+
+        const std::filesystem::path store_directory =
+            command_line.arguments[0];
+
+        try {
+
+            athena::activation::deactivate(
+                store_directory,
+                "/tmp/athena-activation-test/usr"
+            );
+
+            return 0;
+        }
+        catch (const std::exception& error) {
+
+            std::cerr
+                << "Errore: " << error.what() << '\n';
+
+            return 1;
+        }
+    }
+
+    /*
      * Install a package using its package definition.
      *
      * The CLI only determines which package was requested and

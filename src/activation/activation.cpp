@@ -38,6 +38,79 @@ bool target_is_free(
            std::filesystem::file_type::not_found;
 }
 
+void deactivate(
+    const std::filesystem::path& store_directory,
+    const std::filesystem::path& target_root
+)
+{
+    if (!std::filesystem::exists(store_directory)) {
+        throw std::runtime_error(
+            "Directory dello store non trovata: " +
+            store_directory.string()
+        );
+    }
+
+    std::cout
+        << "Disattivazione del pacchetto: "
+        << store_directory.string()
+        << '\n';
+
+    const auto manifest =
+        athena::store::read_manifest(
+            store_directory
+        );
+
+    for (const auto& entry : manifest) {
+
+        const std::filesystem::path source =
+            store_directory / entry.path;
+
+        const std::filesystem::path target =
+            target_root / entry.path;
+
+        const auto status =
+            std::filesystem::symlink_status(target);
+
+        if (status.type() ==
+            std::filesystem::file_type::not_found) {
+            continue;
+        }
+
+        if (status.type() !=
+            std::filesystem::file_type::symlink) {
+            throw std::runtime_error(
+                "Impossibile disattivare: il target non è un symlink: " +
+                target.string()
+            );
+        }
+
+        const auto linked_target =
+            std::filesystem::read_symlink(target);
+
+        const auto expected_target =
+            std::filesystem::absolute(source);
+
+        const auto actual_target =
+            std::filesystem::absolute(
+                target.parent_path() / linked_target
+            );
+
+        if (actual_target != expected_target) {
+            throw std::runtime_error(
+                "Impossibile disattivare: il symlink non punta allo store previsto: " +
+                target.string()
+            );
+        }
+
+        std::cout
+            << "  Rimozione: "
+            << target
+            << '\n';
+
+        std::filesystem::remove(target);
+    }
+}
+
 void activate(
     const std::filesystem::path& store_directory,
     const std::filesystem::path& target_root
