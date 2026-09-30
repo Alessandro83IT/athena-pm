@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace athena::package {
 
@@ -42,6 +43,13 @@ struct Package {
      * the build module.
      */
     std::string build_system;
+
+    /*
+     * Names of packages required by this package.
+     *
+     * Version constraints will be added later.
+     */
+    std::vector<std::string> dependencies;
 };
 
 /*

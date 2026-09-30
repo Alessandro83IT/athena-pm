@@ -35,13 +35,26 @@ Package load_from_file(const std::filesystem::path& path)
          * not present. This keeps older package definitions
          * compatible with the current implementation.
          */
+        std::vector<std::string> dependencies;
+
+        if (const auto* array = table["dependencies"].as_array()) {
+
+            for (const auto& value : *array) {
+
+                if (const auto dependency = value.value<std::string>()) {
+                    dependencies.push_back(*dependency);
+                }
+            }
+        }
+
         return Package{
             table["name"].value_or(""),
             table["version"].value_or(""),
             table["description"].value_or(""),
             table["source"].value_or(""),
             table["sha256"].value_or(""),
-            table["build_system"].value_or("autotools")
+            table["build_system"].value_or("autotools"),
+            dependencies
         };
     }
     catch (const toml::parse_error& error) {

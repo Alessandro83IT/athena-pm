@@ -58,6 +58,31 @@ target_include_directories(version_test
         ${PROJECT_SOURCE_DIR}/src/version
 )
 
+# Standalone test for package manifest loading.
+add_executable(package_loader_test
+    tests/package_loader_test.cpp
+    src/package/package.cpp
+    src/package/package_loader.cpp
+)
+
+target_include_directories(package_loader_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/package
+)
+
+# Standalone test for dependency resolution.
+add_executable(dependency_resolver_test
+    tests/dependency_resolver_test.cpp
+    src/dependency/resolver.cpp
+    src/version/version.cpp
+)
+
+target_include_directories(dependency_resolver_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/dependency
+        ${PROJECT_SOURCE_DIR}/src/package
+)
+
 # Install the Athena package manager executable.
 install(
     TARGETS athena
