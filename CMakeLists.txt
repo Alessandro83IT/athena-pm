@@ -45,3 +45,21 @@ target_include_directories(cmake_backend_test
     PRIVATE
         ${PROJECT_SOURCE_DIR}/src/build
 )
+
+# Install the Athena package manager executable.
+install(
+    TARGETS athena
+    RUNTIME DESTINATION usr/bin
+)
+
+# Build the Athena Package Manager AppImage.
+add_custom_target(appimage
+    COMMAND
+        "${PROJECT_SOURCE_DIR}/packaging/build-appimage.sh"
+    DEPENDS
+        athena
+    WORKING_DIRECTORY
+        "${PROJECT_SOURCE_DIR}"
+    COMMENT
+        "Building Athena Package Manager AppImage"
+)
