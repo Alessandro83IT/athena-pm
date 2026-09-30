@@ -1,4 +1,5 @@
 #include "../src/dependency/expression.hpp"
+#include "../src/dependency/constraint.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -15,11 +16,18 @@ int main()
     auto openssl =
         std::make_shared<const PackageRef>("openssl");
 
+    auto zlib_constraint =
+        std::make_shared<const VersionConstraint>(
+            VersionConstraint::comparison(
+                ComparisonOperator::GreaterEqual,
+                "1.3"
+            )
+        );
+
     auto zlib_version =
         std::make_shared<const VersionComparison>(
             zlib,
-            ComparisonOperator::GreaterEqual,
-            "1.3"
+            zlib_constraint
         );
 
     auto expression =
@@ -66,12 +74,22 @@ int main()
 
     assert(comparison != nullptr);
 
+    assert(comparison->constraint != nullptr);
+
     assert(
-        comparison->op ==
+        comparison->constraint->kind ==
+        VersionConstraint::Kind::Comparison
+    );
+
+    assert(
+        comparison->constraint->comparison_value.op ==
         ComparisonOperator::GreaterEqual
     );
 
-    assert(comparison->version == "1.3");
+    assert(
+        comparison->constraint->comparison_value.version ==
+        "1.3"
+    );
 
     const auto* package =
         dynamic_cast<const PackageRef*>(

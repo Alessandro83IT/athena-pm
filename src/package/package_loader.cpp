@@ -1,6 +1,7 @@
 #include "package_loader.hpp"
 
 #include <toml++/toml.hpp>
+#include <memory>
 #include <stdexcept>
 
 namespace athena::package {
@@ -35,14 +36,26 @@ Package load_from_file(const std::filesystem::path& path)
          * not present. This keeps older package definitions
          * compatible with the current implementation.
          */
-        std::vector<std::string> dependencies;
+        std::vector<athena::dependency::Dependency> dependencies;
 
         if (const auto* array = table["dependencies"].as_array()) {
 
             for (const auto& value : *array) {
 
                 if (const auto dependency = value.value<std::string>()) {
-                    dependencies.push_back(*dependency);
+
+                    auto package =
+                        std::make_shared<const athena::dependency::PackageRef>(
+                            *dependency
+                        );
+
+                    dependencies.push_back(
+                        athena::dependency::Dependency{
+                            package,
+                            athena::dependency::DependencyKind::Runtime,
+                            athena::dependency::DependencyContext::Target
+                        }
+                    );
                 }
             }
         }

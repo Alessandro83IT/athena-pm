@@ -1,23 +1,72 @@
 #include "../src/dependency/resolver.hpp"
+#include "../src/dependency/constraint.hpp"
 
 #include <cassert>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 using athena::package::Package;
+using namespace athena::dependency;
+
+namespace {
+
+Dependency package_dependency(
+    const std::string& name
+)
+{
+    return Dependency{
+        std::make_shared<const PackageRef>(name),
+        DependencyKind::Runtime,
+        DependencyContext::Target
+    };
+}
+
+Dependency versioned_dependency(
+    const std::string& name,
+    VersionConstraint constraint
+)
+{
+    auto package =
+        std::make_shared<const PackageRef>(name);
+
+    auto version_comparison =
+        std::make_shared<const VersionComparison>(
+            package,
+            std::make_shared<const VersionConstraint>(
+                std::move(constraint)
+            )
+        );
+
+    return Dependency{
+        version_comparison,
+        DependencyKind::Runtime,
+        DependencyContext::Target
+    };
+}
+
+}
 
 int main()
 {
     /*
-     * Two versions of the same dependency are available.
-     *
-     * The resolver must select the newest version.
+     * Several versions of zlib are available.
      */
     Package zlib_old{
         "zlib",
         "1.0",
+        "Zlib",
+        "",
+        "",
+        "autotools",
+        {}
+    };
+
+    Package zlib_mid{
+        "zlib",
+        "1.8",
         "Zlib",
         "",
         "",
@@ -35,6 +84,11 @@ int main()
         {}
     };
 
+    /*
+     * A package with an unconstrained dependency.
+     *
+     * The resolver must select the newest version.
+     */
     Package libfoo{
         "libfoo",
         "1.0",
@@ -42,7 +96,9 @@ int main()
         "",
         "",
         "autotools",
-        {"zlib"}
+        {
+            package_dependency("zlib")
+        }
     };
 
     Package app{
@@ -52,11 +108,14 @@ int main()
         "",
         "",
         "autotools",
-        {"libfoo"}
+        {
+            package_dependency("libfoo")
+        }
     };
 
     const std::vector<Package> available{
         zlib_old,
+        zlib_mid,
         zlib_new,
         libfoo
     };
@@ -86,6 +145,131 @@ int main()
     assert(result[2].version == "1.0");
 
     /*
+     * Version constraint:
+     *
+     *     zlib >= 1.5
+     *
+     * The newest satisfying version is 2.0.
+     */
+    Package constrained_app{
+        "constrained-app",
+        "1.0",
+        "Constrained application",
+        "",
+        "",
+        "autotools",
+        {
+            versioned_dependency(
+                "zlib",
+                VersionConstraint::comparison(
+                    ComparisonOperator::GreaterEqual,
+                    "1.5"
+                )
+            )
+        }
+    };
+
+    const auto constrained_result =
+        athena::dependency::resolve(
+            constrained_app,
+            available
+        );
+
+    assert(constrained_result.size() == 2);
+
+    assert(constrained_result[0].name == "zlib");
+    assert(constrained_result[0].version == "2.0");
+
+    assert(constrained_result[1].name == "constrained-app");
+    assert(constrained_result[1].version == "1.0");
+
+    /*
+     * Version range:
+     *
+     *     zlib >= 1.5 AND zlib < 2.0
+     *
+     * The newest satisfying version is 1.8.
+     */
+    Package ranged_app{
+        "ranged-app",
+        "1.0",
+        "Ranged application",
+        "",
+        "",
+        "autotools",
+        {
+            versioned_dependency(
+                "zlib",
+                VersionConstraint::all({
+                    VersionConstraint::comparison(
+                        ComparisonOperator::GreaterEqual,
+                        "1.5"
+                    ),
+                    VersionConstraint::comparison(
+                        ComparisonOperator::Less,
+                        "2.0"
+                    )
+                })
+            )
+        }
+    };
+
+    const auto ranged_result =
+        athena::dependency::resolve(
+            ranged_app,
+            available
+        );
+
+    assert(ranged_result.size() == 2);
+
+    assert(ranged_result[0].name == "zlib");
+    assert(ranged_result[0].version == "1.8");
+
+    assert(ranged_result[1].name == "ranged-app");
+    assert(ranged_result[1].version == "1.0");
+
+    /*
+     * Impossible version constraint:
+     *
+     *     zlib >= 3.0
+     *
+     * No available version satisfies it.
+     */
+    Package impossible_app{
+        "impossible-app",
+        "1.0",
+        "Impossible application",
+        "",
+        "",
+        "autotools",
+        {
+            versioned_dependency(
+                "zlib",
+                VersionConstraint::comparison(
+                    ComparisonOperator::GreaterEqual,
+                    "3.0"
+                )
+            )
+        }
+    };
+
+    bool incompatible_dependency_detected = false;
+
+    try {
+
+        athena::dependency::resolve(
+            impossible_app,
+            available
+        );
+    }
+    catch (const std::runtime_error&) {
+
+        incompatible_dependency_detected = true;
+    }
+
+    assert(incompatible_dependency_detected);
+
+    /*
      * Test missing dependency detection.
      */
     Package broken{
@@ -95,7 +279,9 @@ int main()
         "",
         "",
         "autotools",
-        {"missing"}
+        {
+            package_dependency("missing")
+        }
     };
 
     bool missing_dependency_detected = false;
@@ -124,7 +310,9 @@ int main()
         "",
         "",
         "autotools",
-        {"cycle-b"}
+        {
+            package_dependency("cycle-b")
+        }
     };
 
     Package cycle_b{
@@ -134,7 +322,9 @@ int main()
         "",
         "",
         "autotools",
-        {"cycle-a"}
+        {
+            package_dependency("cycle-a")
+        }
     };
 
     const std::vector<Package> cyclic_packages{

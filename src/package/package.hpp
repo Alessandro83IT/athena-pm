@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../dependency/expression.hpp"
+
 #include <string>
 #include <vector>
 
@@ -45,11 +47,14 @@ struct Package {
     std::string build_system;
 
     /*
-     * Names of packages required by this package.
+     * Dependencies required by this package.
      *
-     * Version constraints will be added later.
+     * Dependencies are represented using Athena's universal
+     * dependency expression model, allowing package names,
+     * capabilities and version constraints to be represented
+     * independently of a specific package ecosystem.
      */
-    std::vector<std::string> dependencies;
+    std::vector<athena::dependency::Dependency> dependencies;
 };
 
 /*

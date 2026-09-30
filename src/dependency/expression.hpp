@@ -1,5 +1,7 @@
 #pragma once
 
+#include "comparison.hpp"
+
 #include <memory>
 #include <string>
 #include <utility>
@@ -7,17 +9,7 @@
 
 namespace athena::dependency {
 
-/*
- * Operators used by version constraints.
- */
-enum class ComparisonOperator {
-    Equal,
-    NotEqual,
-    Less,
-    LessEqual,
-    Greater,
-    GreaterEqual
-};
+struct VersionConstraint;
 
 /*
  * Semantic role of a dependency.
@@ -201,21 +193,17 @@ struct VersionComparison final : Expression {
 
     VersionComparison(
         ExpressionPtr target_expression,
-        ComparisonOperator comparison_operator,
-        std::string comparison_version
+        std::shared_ptr<const VersionConstraint> version_constraint
     )
         : Expression(Kind::VersionComparison),
           target(std::move(target_expression)),
-          op(comparison_operator),
-          version(std::move(comparison_version))
+          constraint(std::move(version_constraint))
     {
     }
 
     ExpressionPtr target;
 
-    ComparisonOperator op;
-
-    std::string version;
+    std::shared_ptr<const VersionConstraint> constraint;
 };
 
 /*

@@ -1,7 +1,9 @@
 #include "resolver.hpp"
 
+#include "constraint.hpp"
 #include "../version/version.hpp"
 
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -13,8 +15,13 @@ namespace {
 
 using Package = athena::package::Package;
 
+/*
+ * Find the newest available package version satisfying
+ * the specified version constraint.
+ */
 const Package* find_package(
     const std::string& name,
+    const VersionConstraint& constraint,
     const std::vector<Package>& available
 )
 {
@@ -23,6 +30,10 @@ const Package* find_package(
     for (const auto& package : available) {
 
         if (package.name != name) {
+            continue;
+        }
+
+        if (!satisfies(constraint, package.version)) {
             continue;
         }
 
@@ -37,6 +48,99 @@ const Package* find_package(
     }
 
     return best_match;
+}
+
+/*
+ * Extract a package name and version constraint from a dependency
+ * expression.
+ *
+ * Currently supported:
+ *
+ *     PackageRef
+ *     VersionComparison(PackageRef, VersionConstraint)
+ *
+ * A plain PackageRef means Any version.
+ */
+struct DependencyTarget {
+    std::string name;
+    VersionConstraint constraint;
+};
+
+DependencyTarget extract_dependency_target(
+    const ExpressionPtr& expression
+)
+{
+    if (!expression) {
+        throw std::runtime_error(
+            "Espressione di dipendenza nulla"
+        );
+    }
+
+    if (expression->kind == Expression::Kind::Package) {
+
+        const auto* package =
+            dynamic_cast<const PackageRef*>(
+                expression.get()
+            );
+
+        if (package == nullptr) {
+            throw std::runtime_error(
+                "Espressione Package non valida"
+            );
+        }
+
+        return {
+            package->name,
+            VersionConstraint::any()
+        };
+    }
+
+    if (expression->kind ==
+        Expression::Kind::VersionComparison) {
+
+        const auto* comparison =
+            dynamic_cast<const VersionComparison*>(
+                expression.get()
+            );
+
+        if (comparison == nullptr ||
+            !comparison->target ||
+            !comparison->constraint) {
+
+            throw std::runtime_error(
+                "Espressione di confronto versione non valida"
+            );
+        }
+
+        if (comparison->target->kind !=
+            Expression::Kind::Package) {
+
+            throw std::runtime_error(
+                "Il confronto di versione deve riferirsi "
+                "a un pacchetto"
+            );
+        }
+
+        const auto* package =
+            dynamic_cast<const PackageRef*>(
+                comparison->target.get()
+            );
+
+        if (package == nullptr) {
+            throw std::runtime_error(
+                "Riferimento al pacchetto non valido"
+            );
+        }
+
+        return {
+            package->name,
+            *comparison->constraint
+        };
+    }
+
+    throw std::runtime_error(
+        "Tipo di espressione di dipendenza non ancora supportato"
+    );
 }
 
 void resolve_recursive(
@@ -74,19 +178,26 @@ void resolve_recursive(
      *
      * This produces a dependency-first ordering.
      */
-    for (const auto& dependency_name : package.dependencies) {
+    for (const auto& dependency : package.dependencies) {
 
-        const Package* dependency =
+        const auto target =
+            extract_dependency_target(
+                dependency.expression
+            );
+
+        const Package* dependency_package =
             find_package(
-                dependency_name,
+                target.name,
+                target.constraint,
                 available
             );
 
-        if (dependency == nullptr) {
+        if (dependency_package == nullptr) {
 
             throw std::runtime_error(
-                "Dipendenza non trovata: " +
-                dependency_name +
+                "Dipendenza non trovata o nessuna versione "
+                "compatibile disponibile: " +
+                target.name +
                 " (richiesta da " +
                 package.name +
                 ")"
@@ -94,7 +205,7 @@ void resolve_recursive(
         }
 
         resolve_recursive(
-            *dependency,
+            *dependency_package,
             available,
             result,
             resolved,

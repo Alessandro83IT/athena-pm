@@ -10,6 +10,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Enable CTest integration.
+enable_testing()
+
 add_executable(athena
     src/main.cpp
     src/cli/cli.cpp
@@ -29,6 +32,7 @@ add_executable(athena
     src/store/manifest.cpp
     src/activation/activation.cpp
     src/version/version.cpp
+    src/dependency/constraint.cpp
 )
 
 target_include_directories(athena
@@ -74,6 +78,7 @@ target_include_directories(package_loader_test
 add_executable(dependency_resolver_test
     tests/dependency_resolver_test.cpp
     src/dependency/resolver.cpp
+    src/dependency/constraint.cpp
     src/version/version.cpp
 )
 
@@ -110,3 +115,23 @@ target_include_directories(dependency_expression_test
     PRIVATE
         ${PROJECT_SOURCE_DIR}/src/dependency
 )
+
+# Standalone test for version constraints.
+add_executable(dependency_constraint_test
+    tests/dependency_constraint_test.cpp
+    src/dependency/constraint.cpp
+    src/version/version.cpp
+)
+
+target_include_directories(dependency_constraint_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/dependency
+)
+
+# Register standalone tests with CTest.
+add_test(NAME cmake_backend_test COMMAND cmake_backend_test)
+add_test(NAME version_test COMMAND version_test)
+add_test(NAME package_loader_test COMMAND package_loader_test WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+add_test(NAME dependency_resolver_test COMMAND dependency_resolver_test)
+add_test(NAME dependency_expression_test COMMAND dependency_expression_test)
+add_test(NAME dependency_constraint_test COMMAND dependency_constraint_test)
