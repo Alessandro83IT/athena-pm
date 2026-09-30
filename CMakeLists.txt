@@ -100,3 +100,13 @@ add_custom_target(appimage
     COMMENT
         "Building Athena Package Manager AppImage"
 )
+
+# Standalone test for the universal dependency expression model.
+add_executable(dependency_expression_test
+    tests/dependency_expression_test.cpp
+)
+
+target_include_directories(dependency_expression_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/dependency
+)
