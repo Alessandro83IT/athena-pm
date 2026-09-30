@@ -309,25 +309,54 @@ int run(int argc, char* argv[])
         }
     }
 
-    /*
-     * Remove is currently only a placeholder.
+     /*
+     * Remove a package from the active system.
      *
-     * The actual implementation will later need to remove or
-     * deactivate a package while respecting dependencies and the
-     * generation model.
+     * The package remains in the immutable store.
+     * Only its activated files are deactivated.
      */
     if (command_line.command == "remove") {
 
-        std::cout << "Remove command\n";
-
-        if (!command_line.arguments.empty()) {
+        if (command_line.arguments.empty()) {
             std::cout
-                << "Package: "
-                << command_line.arguments[0]
-                << '\n';
+                << "Usage: athena remove <package>\n";
+            return 1;
         }
 
-        return 0;
+        try {
+
+            const std::string package_name =
+                command_line.arguments[0];
+
+            const auto store_directory =
+                athena::store::find(
+                    package_name
+                );
+
+            std::cout
+                << "Rimozione del pacchetto: "
+                << package_name
+                << '\n';
+
+            athena::activation::deactivate(
+                store_directory,
+                "/tmp/athena-install-test/usr"
+            );
+
+            std::cout
+                << "Rimozione completata.\n";
+
+            return 0;
+        }
+        catch (const std::exception& error) {
+
+            std::cerr
+                << "Errore: "
+                << error.what()
+                << '\n';
+
+            return 1;
+        }
     }
 
     /*
