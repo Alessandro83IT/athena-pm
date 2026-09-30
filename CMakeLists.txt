@@ -28,6 +28,7 @@ add_executable(athena
     src/store/metadata.cpp
     src/store/manifest.cpp
     src/activation/activation.cpp
+    src/version/version.cpp
 )
 
 target_include_directories(athena
@@ -44,6 +45,17 @@ add_executable(cmake_backend_test
 target_include_directories(cmake_backend_test
     PRIVATE
         ${PROJECT_SOURCE_DIR}/src/build
+)
+
+# Standalone test for version comparison.
+add_executable(version_test
+    tests/version_test.cpp
+    src/version/version.cpp
+)
+
+target_include_directories(version_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/version
 )
 
 # Install the Athena package manager executable.

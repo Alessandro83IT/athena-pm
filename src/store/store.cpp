@@ -1,6 +1,7 @@
 #include "store.hpp"
 
 #include "../paths/paths.hpp"
+#include "../version/version.hpp"
 #include "manifest.hpp"
 #include "metadata.hpp"
 
@@ -179,11 +180,8 @@ std::filesystem::path install(
 /*
  * Find an installed package by name.
  *
- * The current store layout allows multiple versions to exist,
- * although the current search returns the first matching entry.
- *
- * Future generation and dependency-management logic will require
- * a more precise package database and version-selection mechanism.
+ * Multiple versions may exist in the immutable store.
+ * The newest version is selected using Athena's version comparison.
  */
 std::filesystem::path find(
     const std::string& package_name
@@ -192,9 +190,6 @@ std::filesystem::path find(
     const std::filesystem::path store_directory =
         athena::paths::store();
 
-    /*
-     * The store must exist before it can be searched.
-     */
     if (!std::filesystem::exists(store_directory)) {
         throw std::runtime_error(
             "Store non trovato: " +
@@ -202,19 +197,18 @@ std::filesystem::path find(
         );
     }
 
-    /*
-     * Search the store for directories whose name starts with
-     * "<package-name>-".
-     */
+    const std::string expected_prefix =
+        package_name + "-";
+
+    std::filesystem::path best_match;
+    std::string best_version;
+
     for (const auto& entry :
          std::filesystem::directory_iterator(store_directory)) {
 
         if (!entry.is_directory()) {
             continue;
         }
-
-        const std::string expected_prefix =
-            package_name + "-";
 
         const std::string directory_name =
             entry.path().filename().string();
@@ -223,18 +217,37 @@ std::filesystem::path find(
             continue;
         }
 
-        /*
-         * A directory is considered a valid Athena package entry
-         * only when it contains its metadata file.
-         */
         const std::filesystem::path metadata_file =
             entry.path() /
             ".athena" /
             "metadata.toml";
 
-        if (std::filesystem::exists(metadata_file)) {
-            return entry.path();
+        if (!std::filesystem::exists(metadata_file)) {
+            continue;
         }
+
+        const auto metadata =
+            athena::store::read_metadata(
+                entry.path()
+            );
+
+        if (metadata.name != package_name) {
+            continue;
+        }
+
+        if (best_match.empty() ||
+            athena::version::greater(
+                metadata.version,
+                best_version
+            )) {
+
+            best_match = entry.path();
+            best_version = metadata.version;
+        }
+    }
+
+    if (!best_match.empty()) {
+        return best_match;
     }
 
     throw std::runtime_error(
