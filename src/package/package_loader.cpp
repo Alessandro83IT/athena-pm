@@ -1,7 +1,8 @@
 #include "package_loader.hpp"
 
+#include "../dependency/parser.hpp"
+
 #include <toml++/toml.hpp>
-#include <memory>
 #include <stdexcept>
 
 namespace athena::package {
@@ -44,17 +45,10 @@ Package load_from_file(const std::filesystem::path& path)
 
                 if (const auto dependency = value.value<std::string>()) {
 
-                    auto package =
-                        std::make_shared<const athena::dependency::PackageRef>(
-                            *dependency
-                        );
-
                     dependencies.push_back(
-                        athena::dependency::Dependency{
-                            package,
-                            athena::dependency::DependencyKind::Runtime,
-                            athena::dependency::DependencyContext::Target
-                        }
+                        athena::dependency::parse_dependency(
+                            *dependency
+                        )
                     );
                 }
             }

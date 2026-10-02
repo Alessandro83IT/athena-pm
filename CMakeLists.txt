@@ -19,6 +19,7 @@ add_executable(athena
     src/cli/command_line.cpp
     src/package/package.cpp
     src/package/package_loader.cpp
+    src/dependency/parser.cpp
     src/download/downloader.cpp
     src/verify/verifier.cpp
     src/install/installer.cpp
@@ -67,6 +68,7 @@ add_executable(package_loader_test
     tests/package_loader_test.cpp
     src/package/package.cpp
     src/package/package_loader.cpp
+    src/dependency/parser.cpp
 )
 
 target_include_directories(package_loader_test
@@ -135,3 +137,19 @@ add_test(NAME package_loader_test COMMAND package_loader_test WORKING_DIRECTORY 
 add_test(NAME dependency_resolver_test COMMAND dependency_resolver_test)
 add_test(NAME dependency_expression_test COMMAND dependency_expression_test)
 add_test(NAME dependency_constraint_test COMMAND dependency_constraint_test)
+
+# Standalone test for dependency expression parsing.
+add_executable(dependency_parser_test
+    tests/dependency_parser_test.cpp
+    src/dependency/parser.cpp
+    src/dependency/constraint.cpp
+    src/version/version.cpp
+)
+
+target_include_directories(dependency_parser_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/dependency
+        ${PROJECT_SOURCE_DIR}/src/version
+)
+
+add_test(NAME dependency_parser_test COMMAND dependency_parser_test)
