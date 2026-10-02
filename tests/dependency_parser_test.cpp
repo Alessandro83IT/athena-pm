@@ -9,20 +9,47 @@ using namespace athena::dependency;
 namespace {
 
 const PackageRef* get_package_ref(
-    const Dependency& dependency
+    const ExpressionPtr& expression
 )
 {
     return dynamic_cast<const PackageRef*>(
-        dependency.expression.get()
+        expression.get()
     );
 }
 
 const VersionComparison* get_version_comparison(
-    const Dependency& dependency
+    const ExpressionPtr& expression
 )
 {
     return dynamic_cast<const VersionComparison*>(
-        dependency.expression.get()
+        expression.get()
+    );
+}
+
+const AndExpression* get_and_expression(
+    const ExpressionPtr& expression
+)
+{
+    return dynamic_cast<const AndExpression*>(
+        expression.get()
+    );
+}
+
+const OrExpression* get_or_expression(
+    const ExpressionPtr& expression
+)
+{
+    return dynamic_cast<const OrExpression*>(
+        expression.get()
+    );
+}
+
+const NotExpression* get_not_expression(
+    const ExpressionPtr& expression
+)
+{
+    return dynamic_cast<const NotExpression*>(
+        expression.get()
     );
 }
 
@@ -43,7 +70,7 @@ int main()
         );
 
         const auto* package =
-            get_package_ref(dependency);
+            get_package_ref(dependency.expression);
 
         assert(package != nullptr);
         assert(package->name == "zlib");
@@ -59,16 +86,16 @@ int main()
         );
 
         const auto* comparison =
-            get_version_comparison(dependency);
+            get_version_comparison(
+                dependency.expression
+            );
 
         assert(comparison != nullptr);
         assert(comparison->target != nullptr);
         assert(comparison->constraint != nullptr);
 
         const auto* package =
-            dynamic_cast<const PackageRef*>(
-                comparison->target.get()
-            );
+            get_package_ref(comparison->target);
 
         assert(package != nullptr);
         assert(package->name == "zlib");
@@ -94,7 +121,9 @@ int main()
             parse_dependency("openssl < 4.0");
 
         const auto* comparison =
-            get_version_comparison(dependency);
+            get_version_comparison(
+                dependency.expression
+            );
 
         assert(comparison != nullptr);
 
@@ -114,7 +143,9 @@ int main()
             parse_dependency("cmake != 3.30");
 
         const auto* comparison =
-            get_version_comparison(dependency);
+            get_version_comparison(
+                dependency.expression
+            );
 
         assert(comparison != nullptr);
 
@@ -127,6 +158,194 @@ int main()
             comparison->constraint->comparison_value.version ==
             "3.30"
         );
+    }
+
+    {
+        const auto dependency =
+            parse_dependency(
+                "zlib >= 1.2 AND openssl >= 3.0"
+            );
+
+        const auto* and_expression =
+            get_and_expression(
+                dependency.expression
+            );
+
+        assert(and_expression != nullptr);
+        assert(and_expression->expressions.size() == 2);
+
+        const auto* zlib =
+            get_version_comparison(
+                and_expression->expressions[0]
+            );
+
+        const auto* openssl =
+            get_version_comparison(
+                and_expression->expressions[1]
+            );
+
+        assert(zlib != nullptr);
+        assert(openssl != nullptr);
+
+        const auto* zlib_package =
+            get_package_ref(zlib->target);
+
+        const auto* openssl_package =
+            get_package_ref(openssl->target);
+
+        assert(zlib_package != nullptr);
+        assert(openssl_package != nullptr);
+
+        assert(zlib_package->name == "zlib");
+        assert(openssl_package->name == "openssl");
+    }
+
+    {
+        const auto dependency =
+            parse_dependency(
+                "zlib >= 1.2 OR libressl >= 3.5"
+            );
+
+        const auto* or_expression =
+            get_or_expression(
+                dependency.expression
+            );
+
+        assert(or_expression != nullptr);
+        assert(or_expression->expressions.size() == 2);
+
+        const auto* zlib =
+            get_version_comparison(
+                or_expression->expressions[0]
+            );
+
+        const auto* libressl =
+            get_version_comparison(
+                or_expression->expressions[1]
+            );
+
+        assert(zlib != nullptr);
+        assert(libressl != nullptr);
+
+        const auto* zlib_package =
+            get_package_ref(zlib->target);
+
+        const auto* libressl_package =
+            get_package_ref(libressl->target);
+
+        assert(zlib_package != nullptr);
+        assert(libressl_package != nullptr);
+
+        assert(zlib_package->name == "zlib");
+        assert(libressl_package->name == "libressl");
+    }
+
+    {
+        const auto dependency =
+            parse_dependency("NOT zlib");
+
+        const auto* not_expression =
+            get_not_expression(
+                dependency.expression
+            );
+
+        assert(not_expression != nullptr);
+        assert(not_expression->expression != nullptr);
+
+        const auto* package =
+            get_package_ref(
+                not_expression->expression
+            );
+
+        assert(package != nullptr);
+        assert(package->name == "zlib");
+    }
+
+    {
+        const auto dependency =
+            parse_dependency(
+                "(zlib >= 1.2) AND (openssl >= 3.0)"
+            );
+
+        const auto* and_expression =
+            get_and_expression(
+                dependency.expression
+            );
+
+        assert(and_expression != nullptr);
+        assert(and_expression->expressions.size() == 2);
+
+        const auto* zlib =
+            get_version_comparison(
+                and_expression->expressions[0]
+            );
+
+        const auto* openssl =
+            get_version_comparison(
+                and_expression->expressions[1]
+            );
+
+        assert(zlib != nullptr);
+        assert(openssl != nullptr);
+
+        const auto* zlib_package =
+            get_package_ref(zlib->target);
+
+        const auto* openssl_package =
+            get_package_ref(openssl->target);
+
+        assert(zlib_package != nullptr);
+        assert(openssl_package != nullptr);
+
+        assert(zlib_package->name == "zlib");
+        assert(openssl_package->name == "openssl");
+    }
+
+    {
+        const auto dependency =
+            parse_dependency(
+                "zlib OR openssl AND curl"
+            );
+
+        const auto* or_expression =
+            get_or_expression(
+                dependency.expression
+            );
+
+        assert(or_expression != nullptr);
+        assert(or_expression->expressions.size() == 2);
+
+        const auto* zlib =
+            get_package_ref(
+                or_expression->expressions[0]
+            );
+
+        assert(zlib != nullptr);
+        assert(zlib->name == "zlib");
+
+        const auto* and_expression =
+            get_and_expression(
+                or_expression->expressions[1]
+            );
+
+        assert(and_expression != nullptr);
+        assert(and_expression->expressions.size() == 2);
+
+        const auto* openssl =
+            get_package_ref(
+                and_expression->expressions[0]
+            );
+
+        const auto* curl =
+            get_package_ref(
+                and_expression->expressions[1]
+            );
+
+        assert(openssl != nullptr);
+        assert(curl != nullptr);
+
+        assert(openssl->name == "openssl");
+        assert(curl->name == "curl");
     }
 
     {
@@ -147,6 +366,19 @@ int main()
 
         try {
             parse_dependency("");
+        }
+        catch (const std::runtime_error&) {
+            failed = true;
+        }
+
+        assert(failed);
+    }
+
+    {
+        bool failed = false;
+
+        try {
+            parse_dependency("(zlib >= 1.2");
         }
         catch (const std::runtime_error&) {
             failed = true;

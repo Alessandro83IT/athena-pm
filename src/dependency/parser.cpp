@@ -5,155 +5,389 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace athena::dependency {
 
 namespace {
 
-std::string trim(const std::string& text)
-{
-    const auto first =
-        text.find_first_not_of(" \t");
+class Parser {
+public:
 
-    if (first == std::string::npos) {
-        return "";
+    explicit Parser(const std::string& input)
+        : text(input)
+    {
     }
 
-    const auto last =
-        text.find_last_not_of(" \t");
+    ExpressionPtr parse()
+    {
+        skip_whitespace();
 
-    return text.substr(
-        first,
-        last - first + 1
-    );
-}
+        if (position >= text.size()) {
+            throw std::runtime_error(
+                "Espressione di dipendenza vuota"
+            );
+        }
 
-struct ParsedDependency {
-    std::string package;
-    ComparisonOperator op;
-    std::string version;
-    bool has_constraint;
-};
+        auto expression = parse_or();
 
-ParsedDependency parse_text(const std::string& text)
-{
-    const std::string input = trim(text);
+        skip_whitespace();
 
-    if (input.empty()) {
-        throw std::runtime_error(
-            "Espressione di dipendenza vuota"
+        if (position != text.size()) {
+            throw std::runtime_error(
+                "Token inatteso nella dipendenza '" +
+                text +
+                "'"
+            );
+        }
+
+        return expression;
+    }
+
+private:
+
+    ExpressionPtr parse_or()
+    {
+        std::vector<ExpressionPtr> expressions;
+
+        expressions.push_back(parse_and());
+
+        while (consume_keyword("OR")) {
+            expressions.push_back(parse_and());
+        }
+
+        if (expressions.size() == 1) {
+            return expressions.front();
+        }
+
+        return std::make_shared<const OrExpression>(
+            std::move(expressions)
         );
     }
 
-    const auto first_space =
-        input.find_first_of(" \t");
+    ExpressionPtr parse_and()
+    {
+        std::vector<ExpressionPtr> expressions;
 
-    if (first_space == std::string::npos) {
-        return {
-            input,
-            ComparisonOperator::Equal,
-            "",
-            false
-        };
-    }
+        expressions.push_back(parse_unary());
 
-    const std::string package =
-        input.substr(0, first_space);
+        while (consume_keyword("AND")) {
+            expressions.push_back(parse_unary());
+        }
 
-    const std::string constraint =
-        trim(input.substr(first_space));
+        if (expressions.size() == 1) {
+            return expressions.front();
+        }
 
-    if (constraint.empty()) {
-        throw std::runtime_error(
-            "Vincolo di versione mancante per il pacchetto '" +
-            package + "'"
+        return std::make_shared<const AndExpression>(
+            std::move(expressions)
         );
     }
 
-    ComparisonOperator op;
+    ExpressionPtr parse_unary()
+    {
+        if (consume_keyword("NOT")) {
+            return std::make_shared<const NotExpression>(
+                parse_unary()
+            );
+        }
 
-    std::size_t operator_length = 0;
+        return parse_primary();
+    }
 
-    if (constraint.starts_with(">=")) {
-        op = ComparisonOperator::GreaterEqual;
-        operator_length = 2;
+    ExpressionPtr parse_primary()
+    {
+        skip_whitespace();
+
+        if (consume_character('(')) {
+
+            auto expression = parse_or();
+
+            skip_whitespace();
+
+            if (!consume_character(')')) {
+                throw std::runtime_error(
+                    "Parentesi ')' mancante nella dipendenza '" +
+                    text +
+                    "'"
+                );
+            }
+
+            return expression;
+        }
+
+        return parse_dependency_atom();
     }
-    else if (constraint.starts_with("<=")) {
-        op = ComparisonOperator::LessEqual;
-        operator_length = 2;
+
+    ExpressionPtr parse_dependency_atom()
+    {
+        const std::string package = parse_identifier();
+
+        if (package.empty()) {
+            throw std::runtime_error(
+                "Nome del pacchetto mancante nella dipendenza '" +
+                text +
+                "'"
+            );
+        }
+
+        skip_whitespace();
+
+        if (position >= text.size() ||
+            text[position] == ')' ||
+            starts_with_keyword("AND") ||
+            starts_with_keyword("OR"))
+        {
+            return std::make_shared<const PackageRef>(
+                package
+            );
+        }
+
+        const auto op = parse_operator();
+
+        skip_whitespace();
+
+        const std::string version = parse_version();
+
+        if (version.empty()) {
+            throw std::runtime_error(
+                "Versione mancante nella dipendenza '" +
+                text +
+                "'"
+            );
+        }
+
+        auto package_reference =
+            std::make_shared<const PackageRef>(
+                package
+            );
+
+        auto constraint =
+            std::make_shared<const VersionConstraint>(
+                VersionConstraint::comparison(
+                    op,
+                    version
+                )
+            );
+
+        return std::make_shared<const VersionComparison>(
+            package_reference,
+            constraint
+        );
     }
-    else if (constraint.starts_with("!=")) {
-        op = ComparisonOperator::NotEqual;
-        operator_length = 2;
+
+    std::string parse_identifier()
+    {
+        skip_whitespace();
+
+        const std::size_t start = position;
+
+        while (position < text.size()) {
+
+            const char character = text[position];
+
+            if (character == ' ' ||
+                character == '\t' ||
+                character == '(' ||
+                character == ')' ||
+                character == '<' ||
+                character == '>' ||
+                character == '=' ||
+                character == '!')
+            {
+                break;
+            }
+
+            ++position;
+        }
+
+        return text.substr(
+            start,
+            position - start
+        );
     }
-    else if (constraint.starts_with("=")) {
-        op = ComparisonOperator::Equal;
-        operator_length = 1;
+
+    std::string parse_version()
+    {
+        const std::size_t start = position;
+
+        while (position < text.size()) {
+
+            if (text[position] == ')') {
+                break;
+            }
+
+            if (starts_with_keyword("AND") ||
+                starts_with_keyword("OR"))
+            {
+                break;
+            }
+
+            ++position;
+        }
+
+        std::string version =
+            text.substr(
+                start,
+                position - start
+            );
+
+        return trim(version);
     }
-    else if (constraint.starts_with(">")) {
-        op = ComparisonOperator::Greater;
-        operator_length = 1;
-    }
-    else if (constraint.starts_with("<")) {
-        op = ComparisonOperator::Less;
-        operator_length = 1;
-    }
-    else {
+
+    ComparisonOperator parse_operator()
+    {
+        skip_whitespace();
+
+        if (consume_string(">=")) {
+            return ComparisonOperator::GreaterEqual;
+        }
+
+        if (consume_string("<=")) {
+            return ComparisonOperator::LessEqual;
+        }
+
+        if (consume_string("!=")) {
+            return ComparisonOperator::NotEqual;
+        }
+
+        if (consume_string("=")) {
+            return ComparisonOperator::Equal;
+        }
+
+        if (consume_string(">")) {
+            return ComparisonOperator::Greater;
+        }
+
+        if (consume_string("<")) {
+            return ComparisonOperator::Less;
+        }
+
         throw std::runtime_error(
             "Operatore di versione non valido nella dipendenza '" +
-            text + "'"
+            text +
+            "'"
         );
     }
 
-    const std::string version =
-        trim(constraint.substr(operator_length));
+    bool consume_keyword(const std::string& keyword)
+    {
+        skip_whitespace();
 
-    if (version.empty()) {
-        throw std::runtime_error(
-            "Versione mancante nella dipendenza '" +
-            text + "'"
+        if (!starts_with_keyword(keyword)) {
+            return false;
+        }
+
+        position += keyword.size();
+
+        return true;
+    }
+
+    bool starts_with_keyword(
+        const std::string& keyword
+    ) const
+    {
+        if (text.compare(
+                position,
+                keyword.size(),
+                keyword
+            ) != 0)
+        {
+            return false;
+        }
+
+        const std::size_t end =
+            position + keyword.size();
+
+        if (end < text.size()) {
+
+            const char next = text[end];
+
+            if (next != ' ' &&
+                next != '\t' &&
+                next != '(' &&
+                next != ')')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool consume_character(char character)
+    {
+        skip_whitespace();
+
+        if (position >= text.size() ||
+            text[position] != character)
+        {
+            return false;
+        }
+
+        ++position;
+
+        return true;
+    }
+
+    bool consume_string(const std::string& value)
+    {
+        if (text.compare(
+                position,
+                value.size(),
+                value
+            ) != 0)
+        {
+            return false;
+        }
+
+        position += value.size();
+
+        return true;
+    }
+
+    void skip_whitespace()
+    {
+        while (position < text.size() &&
+               (text[position] == ' ' ||
+                text[position] == '\t'))
+        {
+            ++position;
+        }
+    }
+
+    static std::string trim(
+        const std::string& value
+    )
+    {
+        const auto first =
+            value.find_first_not_of(" \t");
+
+        if (first == std::string::npos) {
+            return "";
+        }
+
+        const auto last =
+            value.find_last_not_of(" \t");
+
+        return value.substr(
+            first,
+            last - first + 1
         );
     }
 
-    return {
-        package,
-        op,
-        version,
-        true
-    };
-}
+    const std::string& text;
+    std::size_t position = 0;
+};
 
 }
 
 Dependency parse_dependency(const std::string& text)
 {
-    const auto parsed = parse_text(text);
-
-    auto package =
-        std::make_shared<const PackageRef>(
-            parsed.package
-        );
-
-    ExpressionPtr expression = package;
-
-    if (parsed.has_constraint) {
-        auto constraint =
-            std::make_shared<const VersionConstraint>(
-                VersionConstraint::comparison(
-                    parsed.op,
-                    parsed.version
-                )
-            );
-
-        expression =
-            std::make_shared<const VersionComparison>(
-                package,
-                constraint
-            );
-    }
+    Parser parser(text);
 
     return Dependency{
-        expression,
+        parser.parse(),
         DependencyKind::Runtime,
         DependencyContext::Target
     };

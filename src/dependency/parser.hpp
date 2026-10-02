@@ -18,6 +18,19 @@ namespace athena::dependency {
  *   package <= version
  *   package > version
  *   package >= version
+ *
+ * Logical expressions:
+ *
+ *   expression AND expression
+ *   expression OR expression
+ *   NOT expression
+ *   (expression)
+ *
+ * Logical operator precedence:
+ *
+ *   NOT
+ *   AND
+ *   OR
  */
 Dependency parse_dependency(const std::string& text);
 
