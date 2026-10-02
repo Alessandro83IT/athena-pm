@@ -15,6 +15,18 @@ namespace {
 
 using Package = athena::package::Package;
 
+struct NegativeDependency {
+    std::string name;
+    VersionConstraint constraint;
+};
+
+struct ResolutionState {
+    std::vector<Package> result;
+    std::unordered_set<std::string> resolved;
+    std::unordered_set<std::string> resolving;
+    std::vector<NegativeDependency> negative_dependencies;
+};
+
 /*
  * Find the newest available package version satisfying
  * the specified version constraint.
@@ -148,18 +160,14 @@ void resolve_expression(
     const ExpressionPtr& expression,
     const Package& requiring_package,
     const std::vector<Package>& available,
-    std::vector<Package>& result,
-    std::unordered_set<std::string>& resolved,
-    std::unordered_set<std::string>& resolving
+    ResolutionState& state
 );
 
 void resolve_package_target(
     const DependencyTarget& target,
     const Package& requiring_package,
     const std::vector<Package>& available,
-    std::vector<Package>& result,
-    std::unordered_set<std::string>& resolved,
-    std::unordered_set<std::string>& resolving
+    ResolutionState& state
 )
 {
     const Package* dependency_package =
@@ -184,11 +192,11 @@ void resolve_package_target(
     /*
      * Resolve the selected package recursively.
      */
-    if (resolved.contains(dependency_package->name)) {
+    if (state.resolved.contains(dependency_package->name)) {
         return;
     }
 
-    if (resolving.contains(dependency_package->name)) {
+    if (state.resolving.contains(dependency_package->name)) {
 
         throw std::runtime_error(
             "Ciclo di dipendenze rilevato: " +
@@ -196,7 +204,7 @@ void resolve_package_target(
         );
     }
 
-    resolving.insert(dependency_package->name);
+    state.resolving.insert(dependency_package->name);
 
     for (const auto& dependency :
          dependency_package->dependencies) {
@@ -205,25 +213,21 @@ void resolve_package_target(
             dependency.expression,
             *dependency_package,
             available,
-            result,
-            resolved,
-            resolving
+            state
         );
     }
 
-    resolving.erase(dependency_package->name);
-    resolved.insert(dependency_package->name);
+    state.resolving.erase(dependency_package->name);
+    state.resolved.insert(dependency_package->name);
 
-    result.push_back(*dependency_package);
+    state.result.push_back(*dependency_package);
 }
 
 void resolve_expression(
     const ExpressionPtr& expression,
     const Package& requiring_package,
     const std::vector<Package>& available,
-    std::vector<Package>& result,
-    std::unordered_set<std::string>& resolved,
-    std::unordered_set<std::string>& resolving
+    ResolutionState& state
 )
 {
     if (!expression) {
@@ -246,9 +250,7 @@ void resolve_expression(
                 target,
                 requiring_package,
                 available,
-                result,
-                resolved,
-                resolving
+                state
             );
 
             return;
@@ -274,9 +276,7 @@ void resolve_expression(
                     child,
                     requiring_package,
                     available,
-                    result,
-                    resolved,
-                    resolving
+                    state
                 );
             }
 
@@ -308,9 +308,9 @@ void resolve_expression(
                  * by that attempt are rolled back before trying the
                  * next alternative.
                  */
-                const auto result_size = result.size();
-                const auto resolved_before = resolved;
-                const auto resolving_before = resolving;
+                const auto result_size = state.result.size();
+                const auto resolved_before = state.resolved;
+                const auto resolving_before = state.resolving;
 
                 try {
 
@@ -318,18 +318,16 @@ void resolve_expression(
                         child,
                         requiring_package,
                         available,
-                        result,
-                        resolved,
-                        resolving
+                        state
                     );
 
                     return;
                 }
                 catch (const std::runtime_error& error) {
 
-                    result.resize(result_size);
-                    resolved = resolved_before;
-                    resolving = resolving_before;
+                    state.result.resize(result_size);
+                    state.resolved = resolved_before;
+                    state.resolving = resolving_before;
 
                     last_error = error.what();
                 }
@@ -362,16 +360,14 @@ void resolve_expression(
 void resolve_recursive(
     const Package& package,
     const std::vector<Package>& available,
-    std::vector<Package>& result,
-    std::unordered_set<std::string>& resolved,
-    std::unordered_set<std::string>& resolving
+    ResolutionState& state
 )
 {
-    if (resolved.contains(package.name)) {
+    if (state.resolved.contains(package.name)) {
         return;
     }
 
-    if (resolving.contains(package.name)) {
+    if (state.resolving.contains(package.name)) {
 
         throw std::runtime_error(
             "Ciclo di dipendenze rilevato: " +
@@ -379,7 +375,7 @@ void resolve_recursive(
         );
     }
 
-    resolving.insert(package.name);
+    state.resolving.insert(package.name);
 
     for (const auto& dependency : package.dependencies) {
 
@@ -387,16 +383,14 @@ void resolve_recursive(
             dependency.expression,
             package,
             available,
-            result,
-            resolved,
-            resolving
+            state
         );
     }
 
-    resolving.erase(package.name);
-    resolved.insert(package.name);
+    state.resolving.erase(package.name);
+    state.resolved.insert(package.name);
 
-    result.push_back(package);
+    state.result.push_back(package);
 }
 
 }
@@ -406,20 +400,15 @@ std::vector<athena::package::Package> resolve(
     const std::vector<athena::package::Package>& available
 )
 {
-    std::vector<Package> result;
-
-    std::unordered_set<std::string> resolved;
-    std::unordered_set<std::string> resolving;
+    ResolutionState state;
 
     resolve_recursive(
         root,
         available,
-        result,
-        resolved,
-        resolving
+        state
     );
 
-    return result;
+    return state.result;
 }
 
 }
