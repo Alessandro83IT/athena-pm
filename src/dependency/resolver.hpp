@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../package/package.hpp"
+#include "../repository/repository_index.hpp"
 
 #include <vector>
 
@@ -14,6 +15,23 @@ namespace athena::dependency {
  *
  * The returned vector contains the packages required by the root
  * package, including the root package itself.
+ */
+/*
+ * Resolve dependencies using a repository index.
+ *
+ * The repository is responsible for providing all available versions
+ * of a package; the resolver is responsible for selecting a compatible
+ * solution.
+ */
+std::vector<athena::package::Package> resolve(
+    const athena::package::Package& root,
+    const athena::repository::RepositoryIndex& repository
+);
+
+/*
+ * Compatibility overload for callers that still provide a raw package
+ * collection. The implementation converts the collection into a
+ * RepositoryIndex and delegates to the repository-based resolver.
  */
 std::vector<athena::package::Package> resolve(
     const athena::package::Package& root,

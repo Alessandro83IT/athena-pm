@@ -1,5 +1,6 @@
 #include "../src/dependency/resolver.hpp"
 #include "../src/dependency/constraint.hpp"
+#include "../src/repository/repository_index.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -137,10 +138,22 @@ int main()
     };
 
     /*
+     * Canonical repository used by the RepositoryIndex-based resolver API.
+     *
+     * RepositoryIndex owns the available package definitions; the resolver
+     * decides which compatible versions are required.
+     */
+    athena::repository::RepositoryIndex repository;
+
+    for (const auto& package : available) {
+        repository.add(package);
+    }
+
+    /*
      * Basic dependency resolution.
      */
     const auto result =
-        athena::dependency::resolve(app, available);
+        athena::dependency::resolve(app, repository);
 
     assert(result.size() == 3);
     assert(result[0].name == "zlib");

@@ -79,6 +79,7 @@ target_include_directories(package_loader_test
 # Standalone test for dependency resolution.
 add_executable(dependency_resolver_test
     tests/dependency_resolver_test.cpp
+    src/repository/repository_index.cpp
     src/dependency/resolver.cpp
     src/dependency/constraint.cpp
     src/version/version.cpp
@@ -202,3 +203,20 @@ target_include_directories(gc_test
 )
 
 add_test(NAME gc_test COMMAND gc_test)
+
+# Standalone test for the in-memory repository index.
+add_executable(repository_index_test
+    tests/repository_index_test.cpp
+    src/repository/repository_index.cpp
+    src/package/package.cpp
+    src/version/version.cpp
+)
+
+target_include_directories(repository_index_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/repository
+        ${PROJECT_SOURCE_DIR}/src/package
+        ${PROJECT_SOURCE_DIR}/src/version
+)
+
+add_test(NAME repository_index_test COMMAND repository_index_test)

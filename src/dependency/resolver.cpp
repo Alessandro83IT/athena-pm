@@ -1,9 +1,11 @@
 #include "resolver.hpp"
 
 #include "constraint.hpp"
+#include "../repository/repository_index.hpp"
 #include "../version/version.hpp"
 
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -31,31 +33,32 @@ struct ResolutionState {
  * Find the newest available package version satisfying
  * the specified version constraint.
  */
-const Package* find_package(
+std::optional<Package> find_package(
     const std::string& name,
     const VersionConstraint& constraint,
-    const std::vector<Package>& available
+    const athena::repository::RepositoryIndex& repository
 )
 {
-    const Package* best_match = nullptr;
+    std::optional<Package> best_match;
 
-    for (const auto& package : available) {
-
-        if (package.name != name) {
-            continue;
-        }
+    /*
+     * RepositoryIndex provides all versions of the requested package.
+     * The resolver remains responsible for applying the version
+     * constraint and selecting the newest compatible candidate.
+     */
+    for (const auto& package : repository.find(name)) {
 
         if (!satisfies(constraint, package.version)) {
             continue;
         }
 
-        if (best_match == nullptr ||
+        if (!best_match ||
             athena::version::greater(
                 package.version,
                 best_match->version
             )) {
 
-            best_match = &package;
+            best_match = package;
         }
     }
 
@@ -178,25 +181,25 @@ bool violates_negative_dependency(
 void resolve_expression(
     const ExpressionPtr& expression,
     const Package& requiring_package,
-    const std::vector<Package>& available,
+    const athena::repository::RepositoryIndex& repository,
     ResolutionState& state
 );
 
 void resolve_package_target(
     const DependencyTarget& target,
     const Package& requiring_package,
-    const std::vector<Package>& available,
+    const athena::repository::RepositoryIndex& repository,
     ResolutionState& state
 )
 {
-    const Package* dependency_package =
+    const auto dependency_package =
         find_package(
             target.name,
             target.constraint,
-            available
+            repository
         );
 
-    if (dependency_package == nullptr) {
+    if (!dependency_package) {
 
         throw std::runtime_error(
             "Dipendenza non trovata o nessuna versione "
@@ -209,7 +212,7 @@ void resolve_package_target(
     }
 
     if (violates_negative_dependency(
-            *dependency_package,
+            dependency_package.value(),
             state.negative_dependencies
         )) {
 
@@ -224,6 +227,9 @@ void resolve_package_target(
 
     /*
      * Resolve the selected package recursively.
+     *
+     * The optional contains a complete Package value, so the resolver
+     * can safely keep using it while traversing the dependency graph.
      */
     if (state.resolved.contains(dependency_package->name)) {
         return;
@@ -245,7 +251,7 @@ void resolve_package_target(
         resolve_expression(
             dependency.expression,
             *dependency_package,
-            available,
+            repository,
             state
         );
     }
@@ -259,7 +265,7 @@ void resolve_package_target(
 void resolve_expression(
     const ExpressionPtr& expression,
     const Package& requiring_package,
-    const std::vector<Package>& available,
+    const athena::repository::RepositoryIndex& repository,
     ResolutionState& state
 )
 {
@@ -282,7 +288,7 @@ void resolve_expression(
             resolve_package_target(
                 target,
                 requiring_package,
-                available,
+                repository,
                 state
             );
 
@@ -308,7 +314,7 @@ void resolve_expression(
                 resolve_expression(
                     child,
                     requiring_package,
-                    available,
+                    repository,
                     state
                 );
             }
@@ -352,7 +358,7 @@ void resolve_expression(
                     resolve_expression(
                         child,
                         requiring_package,
-                        available,
+                        repository,
                         state
                     );
 
@@ -443,7 +449,7 @@ void resolve_expression(
 
 void resolve_recursive(
     const Package& package,
-    const std::vector<Package>& available,
+    const athena::repository::RepositoryIndex& repository,
     ResolutionState& state
 )
 {
@@ -466,7 +472,7 @@ void resolve_recursive(
         resolve_expression(
             dependency.expression,
             package,
-            available,
+            repository,
             state
         );
     }
@@ -481,14 +487,14 @@ void resolve_recursive(
 
 std::vector<athena::package::Package> resolve(
     const athena::package::Package& root,
-    const std::vector<athena::package::Package>& available
+    const athena::repository::RepositoryIndex& repository
 )
 {
     ResolutionState state;
 
     resolve_recursive(
         root,
-        available,
+        repository,
         state
     );
 
@@ -513,6 +519,29 @@ std::vector<athena::package::Package> resolve(
     }
 
     return state.result;
+}
+
+/*
+ * Legacy overload.
+ *
+ * Keep the vector-based API source-compatible while making the
+ * RepositoryIndex-based resolver the canonical implementation.
+ */
+std::vector<athena::package::Package> resolve(
+    const athena::package::Package& root,
+    const std::vector<athena::package::Package>& available
+)
+{
+    athena::repository::RepositoryIndex repository;
+
+    for (const auto& package : available) {
+        repository.add(package);
+    }
+
+    return resolve(
+        root,
+        repository
+    );
 }
 
 }
