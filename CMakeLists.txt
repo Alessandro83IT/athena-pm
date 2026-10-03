@@ -95,6 +95,22 @@ target_include_directories(dependency_resolver_test
         ${PROJECT_SOURCE_DIR}/src/package
 )
 
+# Test the InstallPlan abstraction used to transfer the dependency
+# resolver result to the installation layer without performing any
+# installation work.
+add_executable(install_plan_test
+    tests/install_plan_test.cpp
+    src/install/install_plan.cpp
+)
+
+target_include_directories(install_plan_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/install
+        ${PROJECT_SOURCE_DIR}/src/package
+)
+
+add_test(NAME install_plan_test COMMAND install_plan_test)
+
 # Install the Athena package manager executable.
 install(
     TARGETS athena
