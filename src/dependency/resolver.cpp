@@ -156,6 +156,25 @@ DependencyTarget extract_dependency_target(
     );
 }
 
+bool violates_negative_dependency(
+    const Package& package,
+    const std::vector<NegativeDependency>& constraints
+)
+{
+    for (const auto& constraint : constraints) {
+
+        if (package.name != constraint.name) {
+            continue;
+        }
+
+        if (satisfies(constraint.constraint, package.version)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void resolve_expression(
     const ExpressionPtr& expression,
     const Package& requiring_package,
@@ -185,6 +204,20 @@ void resolve_package_target(
             target.name +
             " (richiesta da " +
             requiring_package.name +
+            ")"
+        );
+    }
+
+    if (violates_negative_dependency(
+            *dependency_package,
+            state.negative_dependencies
+        )) {
+
+        throw std::runtime_error(
+            "Dipendenza vietata dal vincolo NOT: " +
+            dependency_package->name +
+            " (" +
+            dependency_package->version +
             ")"
         );
     }
@@ -311,6 +344,8 @@ void resolve_expression(
                 const auto result_size = state.result.size();
                 const auto resolved_before = state.resolved;
                 const auto resolving_before = state.resolving;
+                const auto negative_dependencies_size =
+                    state.negative_dependencies.size();
 
                 try {
 
@@ -325,9 +360,17 @@ void resolve_expression(
                 }
                 catch (const std::runtime_error& error) {
 
+                    /*
+                     * Roll back every change made by the failed
+                     * alternative, including packages already resolved,
+                     * resolution state, and negative NOT constraints.
+                     */
                     state.result.resize(result_size);
                     state.resolved = resolved_before;
                     state.resolving = resolving_before;
+                    state.negative_dependencies.resize(
+                        negative_dependencies_size
+                    );
 
                     last_error = error.what();
                 }
@@ -343,11 +386,52 @@ void resolve_expression(
             );
         }
 
-        case Expression::Kind::Not:
-            throw std::runtime_error(
-                "Espressione NOT non ancora supportata "
-                "dal resolver"
-            );
+        case Expression::Kind::Not: {
+
+            const auto* not_expression =
+                dynamic_cast<const NotExpression*>(
+                    expression.get()
+                );
+
+            if (not_expression == nullptr ||
+                !not_expression->expression) {
+
+                throw std::runtime_error(
+                    "Espressione NOT non valida"
+                );
+            }
+
+            const auto target =
+                extract_dependency_target(
+                    not_expression->expression
+                );
+
+            for (const auto& package : state.result) {
+
+                if (package.name == target.name &&
+                    satisfies(
+                        target.constraint,
+                        package.version
+                    )) {
+
+                    throw std::runtime_error(
+                        "Vincolo NOT violato dal pacchetto già "
+                        "risolto: " +
+                        package.name +
+                        " (" +
+                        package.version +
+                        ")"
+                    );
+                }
+            }
+
+            state.negative_dependencies.push_back({
+                target.name,
+                target.constraint
+            });
+
+            return;
+        }
 
         default:
             throw std::runtime_error(
@@ -407,6 +491,26 @@ std::vector<athena::package::Package> resolve(
         available,
         state
     );
+
+    /*
+     * The root package is part of the final solution just like every
+     * resolved dependency. A NOT constraint introduced while resolving
+     * its dependency graph must therefore be checked against the root
+     * before the complete solution is accepted.
+     */
+    if (violates_negative_dependency(
+            root,
+            state.negative_dependencies
+        )) {
+
+        throw std::runtime_error(
+            "Pacchetto radice vietato dal vincolo NOT: " +
+            root.name +
+            " (" +
+            root.version +
+            ")"
+        );
+    }
 
     return state.result;
 }

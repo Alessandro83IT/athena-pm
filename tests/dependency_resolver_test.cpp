@@ -444,8 +444,66 @@ int main()
     assert(rollback_result[1].name == "rollback-app");
 
     /*
-     * Logical NOT is parsed by the dependency system,
-     * but is intentionally not implemented by the resolver yet.
+     * A failed OR alternative may introduce a negative NOT constraint
+     * before failing. That constraint must be rolled back so that the
+     * following alternative starts from the original resolution state.
+     */
+    Package not_then_missing{
+        "not-then-missing","1.0",
+        "Introduces NOT zlib and then fails","","","autotools",
+        {
+            not_dependency(
+                package_expression("zlib")
+            ),
+            package_dependency("missing-package")
+        }
+    };
+
+    Package zlib_alternative{
+        "zlib","3.0","zlib alternative","","","autotools",
+        {}
+    };
+
+    Package or_not_rollback_app{
+        "or-not-rollback-app","1.0",
+        "Tests NOT rollback in OR","","","autotools",
+        {
+            /*
+             * The first alternative resolves not-then-missing. That
+             * package introduces NOT zlib and then fails on its missing
+             * dependency, so its negative constraint must be rolled back.
+             */
+            or_dependency({
+                package_expression("not-then-missing"),
+                package_expression("zlib")
+            })
+        }
+    };
+
+    const std::vector<Package> or_not_rollback_available{
+        not_then_missing,
+        zlib_alternative
+    };
+
+    const auto or_not_rollback_result =
+        athena::dependency::resolve(
+            or_not_rollback_app,
+            or_not_rollback_available
+        );
+
+    /*
+     * The first alternative fails because missing-package is unavailable.
+     * Its NOT zlib constraint must be discarded, allowing the second
+     * alternative to resolve zlib successfully.
+     */
+    assert(or_not_rollback_result.size() == 2);
+    assert(or_not_rollback_result[0].name == "zlib");
+    assert(or_not_rollback_result[0].version == "3.0");
+    assert(or_not_rollback_result[1].name == "or-not-rollback-app");
+
+    /*
+     * NOT succeeds when the excluded package is not present in the
+     * final dependency graph.
      */
     Package not_app{
         "not-app","1.0","NOT application","","","autotools",
@@ -456,20 +514,157 @@ int main()
         }
     };
 
-    bool not_unsupported_detected = false;
-
-    try {
+    const auto not_result =
         athena::dependency::resolve(
             not_app,
             available
         );
+
+    assert(not_result.size() == 1);
+    assert(not_result[0].name == "not-app");
+
+    /*
+     * NOT must also reject a package that is introduced indirectly
+     * by another dependency.
+     */
+    Package zlib_user{
+        "zlib-user","1.0","Uses zlib","","","autotools",
+        {
+            package_dependency("zlib")
+        }
+    };
+
+    Package conflicting_not_app{
+        "conflicting-not-app","1.0",
+        "NOT zlib but zlib is required","","","autotools",
+        {
+            package_dependency("zlib-user"),
+            not_dependency(
+                package_expression("zlib")
+            )
+        }
+    };
+
+    bool not_conflict_detected = false;
+
+    try {
+        athena::dependency::resolve(
+            conflicting_not_app,
+            available
+        );
     }
     catch (const std::runtime_error&) {
-        not_unsupported_detected = true;
+        not_conflict_detected = true;
     }
 
-    assert(not_unsupported_detected);
+    assert(not_conflict_detected);
+
+    /*
+     * A version-qualified NOT excludes only versions satisfying its
+     * constraint. Therefore zlib 1.8 is allowed by NOT zlib >= 2.0.
+     */
+    Package not_new_zlib{
+        "not-new-zlib","1.0",
+        "Rejects zlib >= 2.0","","","autotools",
+        {
+            /*
+             * The package explicitly requires zlib while simultaneously
+             * forbidding zlib versions >= 2.0. This makes the NOT
+             * constraint observable: zlib 1.8 must succeed, while
+             * zlib 2.0 must make resolution fail.
+             */
+            package_dependency("zlib"),
+            not_dependency(
+                std::make_shared<const VersionComparison>(
+                    package_expression("zlib"),
+                    std::make_shared<const VersionConstraint>(
+                        VersionConstraint::comparison(
+                            ComparisonOperator::GreaterEqual,
+                            "2.0"
+                        )
+                    )
+                )
+            )
+        }
+    };
+
+    std::vector<Package> old_zlib_available{
+        Package{
+            "zlib","1.8","zlib old","","","autotools",
+            {}
+        }
+    };
+
+    const auto old_zlib_result =
+        athena::dependency::resolve(
+            not_new_zlib,
+            old_zlib_available
+        );
+
+    /*
+     * zlib 1.8 satisfies the positive dependency and is not excluded
+     * by NOT zlib >= 2.0, so both packages belong to the result.
+     */
+    assert(old_zlib_result.size() == 2);
+    assert(old_zlib_result[0].name == "zlib");
+    assert(old_zlib_result[0].version == "1.8");
+    assert(old_zlib_result[1].name == "not-new-zlib");
+
+    /*
+     * The same NOT constraint must reject zlib 2.0 or newer.
+     */
+    std::vector<Package> new_zlib_available{
+        Package{
+            "zlib","2.0","zlib new","","","autotools",
+            {}
+        }
+    };
+
+    bool versioned_not_conflict_detected = false;
+
+    try {
+        athena::dependency::resolve(
+            not_new_zlib,
+            new_zlib_available
+        );
+    }
+    catch (const std::runtime_error&) {
+        versioned_not_conflict_detected = true;
+    }
+
+    assert(versioned_not_conflict_detected);
+
+    /*
+     * The root package is part of the final solution.
+     * Therefore a NOT constraint introduced by one of its dependencies
+     * must also be able to reject the root package.
+     */
+    Package root_not_app{
+        "root-not-app","1.0",
+        "Root excluded by its own NOT constraint",
+        "","","autotools",
+        {
+            not_dependency(
+                package_expression("root-not-app")
+            )
+        }
+    };
+
+    bool root_not_conflict_detected = false;
+
+    try {
+        athena::dependency::resolve(
+            root_not_app,
+            available
+        );
+    }
+    catch (const std::runtime_error&) {
+        root_not_conflict_detected = true;
+    }
+
+    assert(root_not_conflict_detected);
 
     std::cout << "Dependency resolver tests passed.\n";
+
     return 0;
 }
