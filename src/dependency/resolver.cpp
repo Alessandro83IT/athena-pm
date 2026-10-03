@@ -487,6 +487,22 @@ void resolve_recursive(
 
 std::vector<athena::package::Package> resolve(
     const athena::package::Package& root,
+    const athena::repository::Repository& repository
+)
+{
+    /*
+     * Repository is the public abstraction used by callers. The resolver
+     * deliberately delegates to its index instead of duplicating package
+     * lookup or repository storage logic.
+     */
+    return resolve(
+        root,
+        repository.index()
+    );
+}
+
+std::vector<athena::package::Package> resolve(
+    const athena::package::Package& root,
     const athena::repository::RepositoryIndex& repository
 )
 {

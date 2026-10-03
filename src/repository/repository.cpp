@@ -7,6 +7,17 @@
 
 namespace athena::repository {
 
+void Repository::add(
+    const athena::package::Package& package
+)
+{
+    /*
+     * Repository is the mutation boundary for package definitions.
+     * The underlying RepositoryIndex remains encapsulated.
+     */
+    index_.add(package);
+}
+
 void Repository::load_package(
     const std::filesystem::path& path
 )

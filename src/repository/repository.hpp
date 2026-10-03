@@ -32,6 +32,16 @@ public:
     );
 
     /*
+     * Add an already-loaded Package to the repository.
+     *
+     * This keeps mutation of the internal RepositoryIndex behind the
+     * Repository abstraction and avoids exposing a mutable index.
+     */
+    void add(
+        const athena::package::Package& package
+    );
+
+    /*
      * Load every package.toml file directly contained in a directory.
      *
      * The first implementation intentionally does not recurse into

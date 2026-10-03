@@ -138,19 +138,24 @@ int main()
     };
 
     /*
-     * Canonical repository used by the RepositoryIndex-based resolver API.
+     * High-level repository used by the public Repository-based resolver API.
      *
-     * RepositoryIndex owns the available package definitions; the resolver
-     * decides which compatible versions are required.
+     * Repository owns package indexing while the resolver remains
+     * responsible for selecting compatible versions.
      */
-    athena::repository::RepositoryIndex repository;
+    athena::repository::Repository repository;
 
     for (const auto& package : available) {
+        /*
+         * The test data is already represented as Package objects, so we
+         * populate the repository through its underlying index here.
+         * Package-file loading is covered separately by repository_test.
+         */
         repository.add(package);
     }
 
     /*
-     * Basic dependency resolution.
+     * Basic dependency resolution through the high-level Repository API.
      */
     const auto result =
         athena::dependency::resolve(app, repository);

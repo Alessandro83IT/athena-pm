@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../package/package.hpp"
+#include "../repository/repository.hpp"
 #include "../repository/repository_index.hpp"
 
 #include <vector>
@@ -27,6 +28,18 @@ std::vector<athena::package::Package> resolve(
     const athena::package::Package& root,
     const athena::repository::RepositoryIndex& repository
 );
+
+/*
+ * Resolve dependencies using a high-level Repository.
+ *
+ * Repository owns package loading and repository indexing; the resolver
+ * only consumes its index when selecting compatible package versions.
+ */
+std::vector<athena::package::Package> resolve(
+    const athena::package::Package& root,
+    const athena::repository::Repository& repository
+);
+
 
 /*
  * Compatibility overload for callers that still provide a raw package
