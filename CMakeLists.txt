@@ -153,3 +153,33 @@ target_include_directories(dependency_parser_test
 )
 
 add_test(NAME dependency_parser_test COMMAND dependency_parser_test)
+
+# Standalone test for package activation and deactivation.
+add_executable(activation_test
+    tests/activation_test.cpp
+    src/activation/activation.cpp
+    src/store/manifest.cpp
+)
+
+target_include_directories(activation_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/activation
+        ${PROJECT_SOURCE_DIR}/src/store
+)
+
+add_test(NAME activation_test COMMAND activation_test)
+
+# Standalone test for immutable generation management.
+add_executable(generation_test
+    tests/generation_test.cpp
+    src/generation/generation.cpp
+    src/activation/activation.cpp
+    src/store/manifest.cpp
+)
+
+target_include_directories(generation_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/generation
+)
+
+add_test(NAME generation_test COMMAND generation_test)

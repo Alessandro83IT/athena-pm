@@ -162,17 +162,61 @@ void activate(
         );
     }
 
-    for (const auto& file : files) {
+    /*
+     * Keep track of every symlink successfully created by this
+     * activation transaction. If a later operation fails, these
+     * targets can be removed without touching pre-existing objects.
+     */
+    std::vector<std::filesystem::path> activated_targets;
 
-        std::cout
-            << "  File: "
-            << file.second
-            << '\n';
+    try {
 
-        activate_file(
-            file.first,
-            file.second
-        );
+        for (const auto& file : files) {
+
+            std::cout
+                << "  File: "
+                << file.second
+                << '\n';
+
+            activate_file(
+                file.first,
+                file.second
+            );
+
+            /*
+             * Record the target only after successful creation.
+             * Therefore rollback can remove only objects created
+             * by this activation transaction.
+             */
+            activated_targets.push_back(
+                file.second
+            );
+        }
+    }
+    catch (...) {
+
+        /*
+         * Undo the transaction in reverse order. We intentionally
+         * ignore cleanup errors here so that the original exception
+         * remains the one reported to the caller.
+         */
+        for (
+            auto it = activated_targets.rbegin();
+            it != activated_targets.rend();
+            ++it
+        ) {
+            std::error_code error;
+
+            std::filesystem::remove(
+                *it,
+                error
+            );
+        }
+
+        /*
+         * Preserve the original activation failure.
+         */
+        throw;
     }
   
 }

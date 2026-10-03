@@ -1,0 +1,126 @@
+#pragma once
+
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+namespace athena::generation {
+
+/*
+ * A generation entry identifies one package and the immutable store
+ * directory containing its files.
+ *
+ * The generation stores references to immutable data; it never owns
+ * or copies the package files themselves.
+ */
+struct GenerationEntry {
+
+    // Logical package name represented by this store entry.
+    std::string package;
+
+    // Immutable store directory containing the package files.
+    std::string store_path;
+
+    /*
+     * Generation entries are value objects. Equality therefore means
+     * that both the logical package and its immutable store reference
+     * are identical.
+     */
+    bool operator==(
+        const GenerationEntry&
+    ) const = default;
+};
+
+/*
+ * A Generation represents one complete logical state of the
+ * activated Athena environment.
+ *
+ * Once persisted, a generation is immutable.
+ */
+struct Generation {
+
+    // Monotonically increasing generation identifier.
+    std::uint64_t id;
+
+    // Packages composing this generation.
+    std::vector<GenerationEntry> entries;
+};
+
+/*
+ * Manage the persistent set of Athena generations.
+ *
+ * The manager stores generation metadata below:
+ *
+ *     <state>/generations/<id>/generation.toml
+ *
+ * and keeps the identifier of the active generation in:
+ *
+ *     <state>/generations/current
+ */
+class GenerationManager {
+
+public:
+
+    explicit GenerationManager(
+        std::filesystem::path state_directory
+    );
+
+    /*
+     * Create Generation 0 if no generations exist yet.
+     *
+     * If generations already exist, the existing current generation
+     * is returned without modifying persistent state.
+     */
+    Generation initialize();
+
+    /*
+     * Create a new immutable generation containing the supplied
+     * store references. The new generation is not activated.
+     */
+    Generation create(
+        const std::vector<GenerationEntry>& entries
+    );
+
+    /*
+     * Read an existing generation.
+     */
+    Generation get(
+        std::uint64_t id
+    ) const;
+
+    /*
+     * Return the currently selected generation.
+     */
+    Generation current() const;
+
+    /*
+     * Switch the active filesystem state to an existing generation.
+     *
+     * The persistent current-generation pointer is updated only
+     * after the filesystem transition succeeds.
+     */
+    void switch_to(
+        std::uint64_t id,
+        const std::filesystem::path& target_root
+    );
+
+private:
+
+    std::filesystem::path state_directory_;
+    std::filesystem::path generations_directory_;
+
+    void ensure_directories() const;
+
+    void write_generation(
+        const Generation& generation
+    ) const;
+
+    void write_current(
+        std::uint64_t id
+    ) const;
+
+    std::uint64_t next_id() const;
+};
+
+}
