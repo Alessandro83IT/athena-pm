@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include "install_plan.hpp"
 
 namespace athena::install {
 
@@ -30,6 +31,18 @@ namespace athena::install {
  */
 void install_package(
     const std::filesystem::path& package_file,
+    const std::filesystem::path& target_root
+);
+
+/*
+ * Execute an already-resolved InstallPlan.
+ *
+ * The dependency resolver decides which packages are required and
+ * preserves their dependency-before-dependent ordering. The installer
+ * only executes that plan and does not perform dependency resolution.
+ */
+void install_plan(
+    const InstallPlan& plan,
     const std::filesystem::path& target_root
 );
 

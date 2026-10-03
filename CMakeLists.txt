@@ -23,6 +23,7 @@ add_executable(athena
     src/download/downloader.cpp
     src/verify/verifier.cpp
     src/install/installer.cpp
+    src/install/install_plan.cpp
     src/paths/paths.cpp
     src/archive/archive.cpp
     src/build/builder.cpp

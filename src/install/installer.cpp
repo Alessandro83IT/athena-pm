@@ -16,14 +16,20 @@
 
 namespace athena::install {
 
-void install_package(
-    const std::filesystem::path& package_file,
+/*
+ * Execute the complete installation pipeline for one already-loaded
+ * Package.
+ *
+ * Dependency resolution is deliberately outside this function. This
+ * keeps the installer focused on executing a package installation,
+ * while InstallPlan remains the boundary between resolution and
+ * execution.
+ */
+void install_one_package(
+    const athena::package::Package& package,
     const std::filesystem::path& target_root
 )
 {
-    const athena::package::Package package =
-        athena::package::load_from_file(package_file);
-
     std::cout
         << "Installazione di: " << package.name
         << " " << package.version << '\n';
@@ -153,6 +159,44 @@ void install_package(
 
     std::cout
         << "Attivazione completata.\n";
+}
+
+void install_package(
+    const std::filesystem::path& package_file,
+    const std::filesystem::path& target_root
+)
+{
+    /*
+     * The single-package API remains compatible with the existing CLI.
+     * It loads the package definition and delegates execution to the
+     * same pipeline used by InstallPlan.
+     */
+    const athena::package::Package package =
+        athena::package::load_from_file(package_file);
+
+    install_one_package(
+        package,
+        target_root
+    );
+}
+
+void install_plan(
+    const InstallPlan& plan,
+    const std::filesystem::path& target_root
+)
+{
+    /*
+     * InstallPlan already contains the dependency-before-dependent
+     * ordering produced by the resolver. The installer must therefore
+     * execute packages in exactly that order and must not resolve or
+     * reorder dependencies itself.
+     */
+    for (const auto& package : plan.packages()) {
+        install_one_package(
+            package,
+            target_root
+        );
+    }
 }
 
 }
