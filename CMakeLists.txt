@@ -183,3 +183,22 @@ target_include_directories(generation_test
 )
 
 add_test(NAME generation_test COMMAND generation_test)
+
+# Standalone test for immutable store garbage collection.
+add_executable(gc_test
+    tests/gc_test.cpp
+    src/store/gc.cpp
+    src/store/metadata.cpp
+    src/generation/generation.cpp
+    src/activation/activation.cpp
+    src/store/manifest.cpp
+)
+
+target_include_directories(gc_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/store
+        ${PROJECT_SOURCE_DIR}/src/generation
+        ${PROJECT_SOURCE_DIR}/src/activation
+)
+
+add_test(NAME gc_test COMMAND gc_test)

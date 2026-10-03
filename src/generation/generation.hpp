@@ -90,6 +90,14 @@ public:
     ) const;
 
     /*
+     * Return every persisted generation in ascending ID order.
+     *
+     * The garbage collector uses all generations as roots so that
+     * historical rollback targets remain available.
+     */
+    std::vector<Generation> list() const;
+
+    /*
      * Return the currently selected generation.
      */
     Generation current() const;

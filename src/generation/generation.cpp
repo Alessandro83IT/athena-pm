@@ -283,6 +283,65 @@ Generation GenerationManager::get(
 }
 
 /*
+ * Load every persisted generation.
+ *
+ * Directory names that are not numeric generation identifiers are
+ * ignored, matching the behavior already used by next_id(). The
+ * returned vector is sorted by generation ID to keep callers
+ * deterministic.
+ */
+std::vector<Generation> GenerationManager::list() const
+{
+    ensure_directories();
+
+    std::vector<Generation> generations;
+
+    for (
+        const auto& entry :
+        std::filesystem::directory_iterator(
+            generations_directory_
+        )
+    ) {
+        if (!entry.is_directory()) {
+            continue;
+        }
+
+        try {
+            const auto id =
+                std::stoull(
+                    entry.path().filename().string()
+                );
+
+            generations.push_back(
+                get(id)
+            );
+        }
+        catch (const std::invalid_argument&) {
+            /*
+             * Ignore auxiliary directories such as non-numeric
+             * filesystem entries.
+             */
+        }
+        catch (const std::out_of_range&) {
+            throw std::runtime_error(
+                "Identificatore di generation fuori intervallo: " +
+                entry.path().string()
+            );
+        }
+    }
+
+    std::sort(
+        generations.begin(),
+        generations.end(),
+        [](const Generation& left, const Generation& right) {
+            return left.id < right.id;
+        }
+    );
+
+    return generations;
+}
+
+/*
  * Create a new immutable generation.
  */
 Generation GenerationManager::create(
