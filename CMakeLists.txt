@@ -220,3 +220,26 @@ target_include_directories(repository_index_test
 )
 
 add_test(NAME repository_index_test COMMAND repository_index_test)
+
+# Test the high-level repository abstraction, including package loading
+# from package.toml files and insertion into the repository index.
+add_executable(repository_test
+    tests/repository_test.cpp
+    src/repository/repository.cpp
+    src/repository/repository_index.cpp
+    src/package/package.cpp
+    src/package/package_loader.cpp
+    src/dependency/parser.cpp
+    src/dependency/constraint.cpp
+    src/version/version.cpp
+)
+
+target_include_directories(repository_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/repository
+        ${PROJECT_SOURCE_DIR}/src/package
+        ${PROJECT_SOURCE_DIR}/src/dependency
+        ${PROJECT_SOURCE_DIR}/src/version
+)
+
+add_test(NAME repository_test COMMAND repository_test)
