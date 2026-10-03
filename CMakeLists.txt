@@ -33,6 +33,7 @@ add_executable(athena
     src/store/metadata.cpp
     src/store/manifest.cpp
     src/activation/activation.cpp
+    src/generation/generation.cpp
     src/version/version.cpp
     src/dependency/constraint.cpp
 )

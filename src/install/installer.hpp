@@ -1,33 +1,17 @@
 #pragma once
 
-#include <filesystem>
 #include "install_plan.hpp"
+
+#include <filesystem>
 
 namespace athena::install {
 
 /*
  * Install a package described by a package definition file.
  *
- * This function coordinates the complete package installation
- * pipeline:
- *
- *     package definition
- *          ↓
- *        download
- *          ↓
- *        verify
- *          ↓
- *        extract
- *          ↓
- *         build
- *          ↓
- *       staging
- *          ↓
- *         store
- *
- * The package is not installed directly into the live system.
- * Instead, the builder creates a staged filesystem tree which
- * is then transferred into the Athena package store.
+ * The package is resolved as a single-package plan and executed
+ * through the same transactional generation pipeline used by
+ * multi-package installations.
  */
 void install_package(
     const std::filesystem::path& package_file,
@@ -38,8 +22,12 @@ void install_package(
  * Execute an already-resolved InstallPlan.
  *
  * The dependency resolver decides which packages are required and
- * preserves their dependency-before-dependent ordering. The installer
- * only executes that plan and does not perform dependency resolution.
+ * preserves their dependency-before-dependent ordering.
+ *
+ * The installer first places every package in the immutable store,
+ * then creates a new Generation and activates that generation
+ * transactionally. Individual packages are therefore never activated
+ * directly by the installation loop.
  */
 void install_plan(
     const InstallPlan& plan,

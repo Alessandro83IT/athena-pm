@@ -8,26 +8,29 @@
 #include "../archive/archive.hpp"
 #include "../build/builder.hpp"
 #include "../store/store.hpp"
-#include "../activation/activation.hpp"
+#include "../generation/generation.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 
 namespace athena::install {
 
 /*
- * Execute the complete installation pipeline for one already-loaded
- * Package.
+ * Execute the build and store pipeline for one already-loaded Package.
  *
- * Dependency resolution is deliberately outside this function. This
- * keeps the installer focused on executing a package installation,
- * while InstallPlan remains the boundary between resolution and
- * execution.
+ * Dependency resolution and activation are deliberately outside this
+ * function. This function only turns a package definition into an
+ * immutable store entry.
+ *
+ * Keeping activation out of this step is essential for transactional
+ * InstallPlan execution: all packages must reach the store before a
+ * new generation is activated.
  */
-void install_one_package(
-    const athena::package::Package& package,
-    const std::filesystem::path& target_root
+std::filesystem::path install_one_package(
+    const athena::package::Package& package
 )
 {
     std::cout
@@ -88,7 +91,7 @@ void install_one_package(
     /*
      * Create a dedicated build directory for this package.
      *
-     * Build artifacts must be kept separate from the source tree.
+     * Build artifacts must remain separate from the source tree.
      * This is especially important for out-of-source build systems
      * such as CMake.
      */
@@ -97,9 +100,8 @@ void install_one_package(
         (package.name + "-" + package.version);
 
     /*
-     * The staging directory is kept separate from the build
-     * directory. It represents the temporary filesystem root
-     * produced by the package installation step.
+     * The staging directory represents the temporary filesystem tree
+     * that will be transferred into the immutable package store.
      */
     const std::filesystem::path staging =
         athena::paths::build() /
@@ -149,16 +151,62 @@ void install_one_package(
         << "Installazione nello store completata: "
         << installed << '\n';
 
-    std::cout
-        << "Attivazione del pacchetto...\n";
+    /*
+     * Return the immutable store directory instead of activating it.
+     *
+     * The caller uses this reference to construct the new Generation.
+     */
+    return installed;
+}
 
-    athena::activation::activate(
-        installed,
-        target_root / "usr"
-    );
+/*
+ * Build the complete generation that should become active after an
+ * InstallPlan has been executed.
+ *
+ * The current generation represents the complete active environment.
+ * Packages appearing in the new plan replace entries with the same
+ * logical package name; packages not mentioned by the plan remain
+ * active. This makes an InstallPlan an incremental state transition
+ * rather than an instruction to discard the existing environment.
+ */
+std::vector<athena::generation::GenerationEntry> build_target_entries(
+    const athena::generation::Generation& current,
+    const std::vector<
+        std::pair<
+            athena::package::Package,
+            std::filesystem::path
+        >
+    >& installed
+)
+{
+    std::vector<athena::generation::GenerationEntry> entries =
+        current.entries;
 
-    std::cout
-        << "Attivazione completata.\n";
+    for (const auto& [package, store_path] : installed) {
+
+        const auto it =
+            std::find_if(
+                entries.begin(),
+                entries.end(),
+                [&package](const auto& entry) {
+                    return entry.package == package.name;
+                }
+            );
+
+        const athena::generation::GenerationEntry replacement{
+            package.name,
+            store_path.string()
+        };
+
+        if (it != entries.end()) {
+            *it = replacement;
+        }
+        else {
+            entries.push_back(replacement);
+        }
+    }
+
+    return entries;
 }
 
 void install_package(
@@ -167,15 +215,18 @@ void install_package(
 )
 {
     /*
-     * The single-package API remains compatible with the existing CLI.
-     * It loads the package definition and delegates execution to the
-     * same pipeline used by InstallPlan.
+     * Preserve the existing single-package API by constructing a
+     * one-package InstallPlan and delegating to the same transactional
+     * execution path used for multi-package plans.
      */
     const athena::package::Package package =
         athena::package::load_from_file(package_file);
 
-    install_one_package(
-        package,
+    InstallPlan plan;
+    plan.add(package);
+
+    install_plan(
+        plan,
         target_root
     );
 }
@@ -186,17 +237,93 @@ void install_plan(
 )
 {
     /*
-     * InstallPlan already contains the dependency-before-dependent
-     * ordering produced by the resolver. The installer must therefore
-     * execute packages in exactly that order and must not resolve or
-     * reorder dependencies itself.
+     * An empty plan represents no requested state transition.
+     * Avoid creating a redundant generation in that case.
      */
+    if (plan.empty()) {
+        return;
+    }
+
+    /*
+     * The generation manager owns persistent generation metadata and
+     * the current-generation pointer. Initialize it before reading
+     * the current state so a fresh Athena installation starts from
+     * Generation 0.
+     */
+    athena::generation::GenerationManager generations(
+        athena::paths::root()
+    );
+
+    generations.initialize();
+
+    /*
+     * Install every package into the immutable store first.
+     *
+     * No package is activated at this stage. Therefore a failure
+     * during download, verification, extraction, build or storage
+     * leaves the currently active generation untouched.
+     */
+    std::vector<
+        std::pair<
+            athena::package::Package,
+            std::filesystem::path
+        >
+    > installed;
+
+    installed.reserve(plan.size());
+
     for (const auto& package : plan.packages()) {
-        install_one_package(
+        installed.emplace_back(
             package,
-            target_root
+            install_one_package(package)
         );
     }
+
+    /*
+     * Construct the complete target generation by applying the
+     * installation plan to the current active environment.
+     */
+    const auto current =
+        generations.current();
+
+    const auto target_entries =
+        build_target_entries(
+            current,
+            installed
+        );
+
+    /*
+     * Persist the new generation before switching to it. Generation
+     * metadata is immutable and can therefore safely become a rollback
+     * target even after a later operation fails.
+     */
+    const auto target =
+        generations.create(
+            target_entries
+        );
+
+    std::cout
+        << "Nuova generation: "
+        << target.id << '\n';
+
+    /*
+     * Activation and the persistent current-generation pointer are
+     * handled by GenerationManager as one state transition.
+     */
+    std::cout
+        << "Attivazione della generation "
+        << target.id
+        << "...\n";
+
+    generations.switch_to(
+        target.id,
+        target_root
+    );
+
+    std::cout
+        << "Generation "
+        << target.id
+        << " attivata.\n";
 }
 
 }
