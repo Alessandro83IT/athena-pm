@@ -14,7 +14,26 @@ namespace athena::paths {
  * The exact layout may evolve as the package store and generation
  * system become more sophisticated.
  */
+/*
+ * Root directory of the Athena filesystem hierarchy.
+ *
+ * The optional override is primarily useful for tests and isolated
+ * installation environments. Production code keeps the default
+ * /var/lib/athena root.
+ */
 std::filesystem::path root();
+
+/*
+ * Redirect all Athena-managed paths to another filesystem root.
+ *
+ * This is process-local and is primarily used by isolated tests.
+ */
+void set_root(const std::filesystem::path& path);
+
+/*
+ * Restore the normal production filesystem root.
+ */
+void reset_root();
 
 /*
  * Directory containing downloaded package archives.

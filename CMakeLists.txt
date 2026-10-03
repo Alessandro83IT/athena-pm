@@ -24,6 +24,7 @@ add_executable(athena
     src/verify/verifier.cpp
     src/install/installer.cpp
     src/install/install_plan.cpp
+    src/install/generation_builder.cpp
     src/paths/paths.cpp
     src/archive/archive.cpp
     src/build/builder.cpp
@@ -105,6 +106,20 @@ target_include_directories(dependency_resolver_test
 add_executable(install_plan_test
     tests/install_plan_test.cpp
     src/install/install_plan.cpp
+)
+
+
+# Test construction of the target generation produced by an installation plan.
+add_executable(generation_builder_test
+    tests/generation_builder_test.cpp
+    src/install/generation_builder.cpp
+)
+
+target_include_directories(generation_builder_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/install
+        ${PROJECT_SOURCE_DIR}/src/generation
+        ${PROJECT_SOURCE_DIR}/src/package
 )
 
 target_include_directories(install_plan_test
@@ -208,6 +223,48 @@ target_include_directories(generation_test
 )
 
 add_test(NAME generation_test COMMAND generation_test)
+
+# End-to-end test for the complete InstallPlan -> Store -> Generation
+# -> Activation pipeline using a local CMake fixture and temporary paths.
+add_test(NAME generation_builder_test COMMAND generation_builder_test)
+
+add_executable(installer_e2e_test
+    tests/installer_e2e_test.cpp
+    src/install/installer.cpp
+    src/package/package.cpp
+    src/package/package_loader.cpp
+    src/dependency/parser.cpp
+    src/dependency/constraint.cpp
+    src/version/version.cpp
+    src/install/install_plan.cpp
+    src/install/generation_builder.cpp
+    src/download/downloader.cpp
+    src/verify/verifier.cpp
+    src/paths/paths.cpp
+    src/archive/archive.cpp
+    src/build/builder.cpp
+    src/build/autotools_backend.cpp
+    src/build/cmake_backend.cpp
+    src/store/store.cpp
+    src/store/metadata.cpp
+    src/store/manifest.cpp
+    src/activation/activation.cpp
+    src/generation/generation.cpp
+)
+
+target_include_directories(installer_e2e_test
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/install
+        ${PROJECT_SOURCE_DIR}/src/package
+        ${PROJECT_SOURCE_DIR}/src/dependency
+        ${PROJECT_SOURCE_DIR}/src/paths
+        ${PROJECT_SOURCE_DIR}/src/store
+        ${PROJECT_SOURCE_DIR}/src/generation
+        ${PROJECT_SOURCE_DIR}/src/activation
+        ${PROJECT_SOURCE_DIR}/src/build
+)
+
+add_test(NAME installer_e2e_test COMMAND installer_e2e_test)
 
 # Standalone test for immutable store garbage collection.
 add_executable(gc_test

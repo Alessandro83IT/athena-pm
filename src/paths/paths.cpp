@@ -2,6 +2,17 @@
 
 namespace athena::paths {
 
+namespace {
+
+/*
+ * Keep the production default in one place while allowing tests to
+ * redirect the complete Athena filesystem hierarchy into a temporary
+ * directory.
+ */
+std::filesystem::path root_directory = "/var/lib/athena";
+
+}
+
 /*
  * Root directory of the Athena-PM filesystem hierarchy.
  *
@@ -10,7 +21,26 @@ namespace athena::paths {
  */
 std::filesystem::path root()
 {
-    return "/var/lib/athena";
+    return root_directory;
+}
+
+/*
+ * Override the filesystem root used by all Athena path helpers.
+ *
+ * This is intentionally process-local: it is a testing/isolation
+ * mechanism, not persistent configuration.
+ */
+void set_root(const std::filesystem::path& path)
+{
+    root_directory = path;
+}
+
+/*
+ * Restore the normal production filesystem root.
+ */
+void reset_root()
+{
+    root_directory = "/var/lib/athena";
 }
 
 /*
