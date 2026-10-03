@@ -1,6 +1,7 @@
 #include "../src/dependency/resolver.hpp"
 #include "../src/dependency/constraint.hpp"
 #include "../src/repository/repository_index.hpp"
+#include "../src/install/install_plan.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -167,6 +168,36 @@ int main()
     assert(result[1].version == "1.0");
     assert(result[2].name == "app");
     assert(result[2].version == "1.0");
+
+    /*
+     * InstallPlan integration.
+     *
+     * Dependency resolution now exposes InstallPlan as the canonical
+     * bridge to the installation layer. The plan must preserve exactly
+     * the dependency-before-dependent order returned by resolve().
+     */
+    const auto plan =
+        athena::dependency::resolve_plan(
+            app,
+            repository
+        );
+
+    assert(!plan.empty());
+    assert(plan.size() == result.size());
+
+    const auto& planned_packages = plan.packages();
+
+    for (std::size_t i = 0; i < result.size(); ++i) {
+        assert(
+            planned_packages[i].name ==
+            result[i].name
+        );
+
+        assert(
+            planned_packages[i].version ==
+            result[i].version
+        );
+    }
 
     /*
      * Version constraint.

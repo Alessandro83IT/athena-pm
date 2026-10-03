@@ -501,7 +501,7 @@ std::vector<athena::package::Package> resolve(
     );
 }
 
-std::vector<athena::package::Package> resolve(
+athena::install::InstallPlan resolve_plan(
     const athena::package::Package& root,
     const athena::repository::RepositoryIndex& repository
 )
@@ -534,7 +534,52 @@ std::vector<athena::package::Package> resolve(
         );
     }
 
-    return state.result;
+    /*
+     * ResolutionState already stores packages in dependency-before-
+     * dependent order. InstallPlan deliberately preserves that order,
+     * so no additional topological sorting is required here.
+     */
+    athena::install::InstallPlan plan;
+
+    for (const auto& package : state.result) {
+        plan.add(package);
+    }
+
+    return plan;
+}
+
+athena::install::InstallPlan resolve_plan(
+    const athena::package::Package& root,
+    const athena::repository::Repository& repository
+)
+{
+    /*
+     * Repository owns package loading and indexing; the resolver only
+     * consumes the index when constructing the installation plan.
+     */
+    return resolve_plan(
+        root,
+        repository.index()
+    );
+}
+
+/*
+ * Compatibility wrapper.
+ *
+ * Keep the existing vector-based API source-compatible while making
+ * InstallPlan the canonical result of dependency resolution.
+ */
+std::vector<athena::package::Package> resolve(
+    const athena::package::Package& root,
+    const athena::repository::RepositoryIndex& repository
+)
+{
+    const auto plan = resolve_plan(
+        root,
+        repository
+    );
+
+    return plan.packages();
 }
 
 /*

@@ -3,10 +3,33 @@
 #include "../package/package.hpp"
 #include "../repository/repository.hpp"
 #include "../repository/repository_index.hpp"
+#include "../install/install_plan.hpp"
 
 #include <vector>
 
 namespace athena::dependency {
+
+/*
+ * Resolve a package and produce an InstallPlan.
+ *
+ * InstallPlan is the boundary between dependency resolution and the
+ * installation layer: the resolver determines the complete package
+ * solution and preserves dependency-before-dependent ordering, while
+ * the installation layer decides how that plan is executed.
+ */
+athena::install::InstallPlan resolve_plan(
+    const athena::package::Package& root,
+    const athena::repository::RepositoryIndex& repository
+);
+
+/*
+ * Resolve a package using a high-level Repository and produce an
+ * InstallPlan.
+ */
+athena::install::InstallPlan resolve_plan(
+    const athena::package::Package& root,
+    const athena::repository::Repository& repository
+);
 
 /*
  * Resolve the dependencies of a package.

@@ -86,6 +86,7 @@ add_executable(dependency_resolver_test
     src/dependency/parser.cpp
     src/dependency/constraint.cpp
     src/version/version.cpp
+    src/install/install_plan.cpp
 )
 
 target_include_directories(dependency_resolver_test
@@ -93,6 +94,7 @@ target_include_directories(dependency_resolver_test
         ${PROJECT_SOURCE_DIR}/src/repository
         ${PROJECT_SOURCE_DIR}/src/dependency
         ${PROJECT_SOURCE_DIR}/src/package
+        ${PROJECT_SOURCE_DIR}/src/install
 )
 
 # Test the InstallPlan abstraction used to transfer the dependency
